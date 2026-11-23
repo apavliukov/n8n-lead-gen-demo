@@ -1,0 +1,904 @@
+{
+  "name": "Order intake",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "orders",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "272815ff-3882-4246-96d9-b1e2b1a42d0a",
+      "name": "Webhook",
+      "webhookId": "edc2d1a3-89ea-48dd-b395-26b9084b6052"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT s.id AS site_id, s.duplicate_days,\n       s.name AS site_name, s.email_from, s.email_from_name, s.email_reply_to,\n       p.id AS product_id, p.name AS product_name, p.price, p.required_fields\nFROM leadgen.sites s\nLEFT JOIN leadgen.products p ON p.site_id = s.id AND p.external_id = $2\nWHERE s.token::text = $1",
+        "options": {
+          "queryReplacement": "={{ [ $json.body.token ?? '', $json.body.product_id ?? '' ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        224,
+        0
+      ],
+      "id": "a3184afc-f0aa-472d-94e9-b38aac88463a",
+      "name": "Load site and product",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const req = $('Webhook').first().json;\nconst body = req.body ?? {};\nconst row = $input.first().json; // site + product; empty when the token is unknown\n\nconst str = (v) => (typeof v === 'string' ? v.trim() : '');\nconst errors = {};\n\nif (!row.site_id) errors.token = 'unknown site';\nelse if (!row.product_id) errors.product_id = 'unknown product';\n\n// Honeypot: a real form never sends this field.\nif (str(body.terms)) errors.terms = 'must be empty';\n\nconst common = ['idempotency_key', 'first_name', 'last_name', 'email', 'phone',\n  'birth_date', 'street', 'house_number', 'postal_code', 'city', 'iban'];\nfor (const field of [...common, ...(row.required_fields ?? [])]) {\n  if (!str(body[field])) errors[field] = 'required';\n}\n\nconst email = str(body.email).toLowerCase();\nif (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.email = 'invalid';\n\n// 0151..., 0049151..., 49151..., +490151... -> +49151...\nconst digits = str(body.phone).replace(/[^\\d+]/g, '').replace(/^(\\+49|0049|49|0)0*/, '');\nconst phone = '+49' + digits;\nif (str(body.phone) && !/^\\+49\\d{6,13}$/.test(phone)) errors.phone = 'invalid';\n\n// Format check only; the checksum is validated on the landing page.\nconst iban = str(body.iban).replace(/\\s/g, '').toUpperCase();\nif (iban && !/^[A-Z]{2}\\d{2}[A-Z0-9]{11,30}$/.test(iban)) errors.iban = 'invalid';\n\n// DD.MM.YYYY -> YYYY-MM-DD, rejecting impossible dates like 31.02.\nlet birthDate = null;\nlet age = null;\nconst m = str(body.birth_date).match(/^(\\d{2})\\.(\\d{2})\\.(\\d{4})$/);\nif (m) {\n  const iso = `${m[3]}-${m[2]}-${m[1]}`;\n  const d = new Date(`${iso}T00:00:00Z`);\n  if (!isNaN(d) && d.toISOString().slice(0, 10) === iso) {\n    birthDate = iso;\n    const now = new Date();\n    age = now.getUTCFullYear() - d.getUTCFullYear();\n    const hadBirthday = now.getUTCMonth() > d.getUTCMonth()\n      || (now.getUTCMonth() === d.getUTCMonth() && now.getUTCDate() >= d.getUTCDate());\n    if (!hadBirthday) age -= 1;\n  }\n}\nif (str(body.birth_date) && (birthDate === null || age < 0)) errors.birth_date = 'invalid';\n\n// Parsed by hand to stay independent of sandbox globals such as URL.\nconst queryParam = (name) => {\n  const found = str(body.original_url).match(new RegExp(`[?&]${name}=([^&#]*)`));\n  if (!found) return null;\n  try { return decodeURIComponent(found[1].replace(/\\+/g, ' ')); } catch (e) { return found[1]; }\n};\nconst utm = {};\nfor (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content']) {\n  utm[key] = str(body[key]) || queryParam(key) || null;\n}\n// Paid traffic leaves a click id in the URL or the Meta click cookie.\nconst source = queryParam('fbclid') || str(body.fbc) ? 'facebook' : 'direct';\n\n// Service fields are stored in meta, not in the form payload.\nconst { token, terms, idempotency_key, client_ip, user_agent, ...form } = body;\n\nreturn [{\n  json: {\n    valid: Object.keys(errors).length === 0,\n    errors,\n    order: {\n      site_id: row.site_id ?? null,\n      product_id: row.product_id ?? null,\n      idempotency_key: str(idempotency_key),\n      email,\n      phone,\n      source,\n      blocked: age !== null && age < 18,\n      payload: { ...form, email, phone, iban, birth_date: birthDate },\n      meta: {\n        ip: str(client_ip) || req.headers['x-real-ip']\n          || str(req.headers['x-forwarded-for']).split(',')[0].trim() || null,\n        user_agent: str(user_agent) || req.headers['user-agent'] || null,\n        ...utm,\n      },\n    },\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "296345e2-1605-4b81-a279-bd5afaee4969",
+      "name": "Validate"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'error', errors: $json.errors } }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2352,
+        128
+      ],
+      "id": "9b298db6-b02a-49dd-8eca-dcd282c89b00",
+      "name": "Invalid order"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A repeated request (same site + idempotency key) gets the existing order back.\n-- The lookup runs first so that a replay does not consume an order number.\nWITH existing AS (\n    SELECT id, blocked, duplicate\n    FROM leadgen.orders\n    WHERE site_id = $1 AND idempotency_key = $4\n), inserted AS (\n    INSERT INTO leadgen.orders\n        (site_id, product_id, source_id, idempotency_key, email, phone, payload, meta, blocked, next_attempt_at)\n    SELECT $1, $2, s.id, $4, $5, $6, $7::jsonb, $8::jsonb, $9::boolean,\n           CASE\n               WHEN $9::boolean THEN NULL                               -- blocked: never processed\n               WHEN v.email IS NOT NULL THEN now()                      -- verified address: process right away\n               ELSE now() + interval '2 hours'                          -- wait for the verification click\n           END\n    FROM leadgen.sources s\n    LEFT JOIN leadgen.verified_emails v ON v.email = $5\n    WHERE s.code = $3 AND NOT EXISTS (SELECT 1 FROM existing)\n    -- Two simultaneous requests both miss the lookup; the unique index settles it.\n    -- The no-op update makes RETURNING yield the winning row instead of nothing.\n    ON CONFLICT (site_id, idempotency_key) DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key\n    RETURNING id, blocked, duplicate, (xmax = 0) AS created\n)\nSELECT r.id, r.blocked, r.duplicate, r.created,\n       EXISTS (SELECT 1 FROM leadgen.verified_emails WHERE email = $5) AS email_verified\nFROM (\n    SELECT id, blocked, duplicate, created FROM inserted\n    UNION ALL\n    SELECT id, blocked, duplicate, false FROM existing\n) r",
+        "options": {
+          "queryReplacement": "={{ [ $json.order.site_id, $json.order.product_id, $json.order.source, $json.order.idempotency_key, $json.order.email, $json.order.phone, JSON.stringify($json.order.payload), JSON.stringify($json.order.meta), $json.order.blocked ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        976,
+        -112
+      ],
+      "id": "04e9a9d9-7a61-466c-ab58-fe1c1ca2b904",
+      "name": "Save order",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "b3a002b0-dab8-4abc-bdac-3749a659958f",
+              "leftValue": "={{ $json.created && !$json.blocked }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1200,
+        -112
+      ],
+      "id": "6a05452c-224e-41dc-b195-858e95382191",
+      "name": "Needs check?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "d48f9b53-b8f6-45d7-9d18-85c049259bf8",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        672,
+        0
+      ],
+      "id": "7c52e649-c4d0-4cc0-ad9e-2e2a4733d5e9",
+      "name": "Is valid?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "2d162c6e-03e1-460f-a526-4c170c156efc",
+              "leftValue": "={{ $json.is_bad_duplicate === true || $('Save order').first().json.duplicate === 2 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1760,
+        -304
+      ],
+      "id": "b7be1b58-1057-4738-a36e-e248dbc89aec",
+      "name": "Bad duplicate?"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "value": "leadgen",
+          "mode": "list",
+          "cachedResultName": "leadgen"
+        },
+        "table": {
+          "__rl": true,
+          "value": "orders",
+          "mode": "list",
+          "cachedResultName": "orders"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Save order').first().json.id }}",
+            "duplicate": "={{ $json.duplicate }}",
+            "next_attempt_at": "={{ null }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "site_id",
+              "displayName": "site_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "product_id",
+              "displayName": "product_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "source_id",
+              "displayName": "source_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "idempotency_key",
+              "displayName": "idempotency_key",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "meta",
+              "displayName": "meta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "blocked",
+              "displayName": "blocked",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "duplicate",
+              "displayName": "duplicate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "attempts",
+              "displayName": "attempts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "next_attempt_at",
+              "displayName": "next_attempt_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "locked_at",
+              "displayName": "locked_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "completed_at",
+              "displayName": "completed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        2080,
+        -320
+      ],
+      "id": "382f8922-3718-4acd-9a4f-17b4f532262a",
+      "name": "Mark bad duplicate",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "w7nsUDamiw3MRqbI",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/w7nsUDamiw3MRqbI",
+          "cachedResultName": "Duplicate check"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $('Validate').first().json.order.email }}",
+            "phone": "={{ $('Validate').first().json.order.phone }}",
+            "duplicate_days": "={{ $('Load site and product').first().json.duplicate_days }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "duplicate_days",
+              "displayName": "duplicate_days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1456,
+        -304
+      ],
+      "id": "3ca9b153-20b7-45b7-bb72-cf94113b3549",
+      "name": "Check duplicate",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'success', order_id: $('Save order').first().json.id, is_duplicate: true } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2352,
+        -320
+      ],
+      "id": "0057d126-4503-4725-912d-10a60f85f8ce",
+      "name": "Duplicate order"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'success', order_id: $('Save order').first().json.id, is_duplicate: false } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2352,
+        -96
+      ],
+      "id": "ccc2c5db-661a-49fc-82da-4dfc65cdc665",
+      "name": "New order"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "13923ccf-7e43-4c97-a851-a997904be565",
+              "leftValue": "={{ $('Save order').first().json.created && !$('Save order').first().json.blocked && $('Save order').first().json.email_verified }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        2624,
+        -96
+      ],
+      "id": "b816a833-5cb5-4e8a-81b7-22f3797ec177",
+      "name": "Process now?"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "xkombxDshfrFbgWY",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/xkombxDshfrFbgWY",
+          "cachedResultName": "Order processing"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order_id": "={{ $('Save order').first().json.id }}"
+          },
+          "matchingColumns": [
+            "order_id"
+          ],
+          "schema": [
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        2944,
+        -112
+      ],
+      "id": "f79161f0-eb3b-4039-ae77-3df698db266a",
+      "name": "Process order"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "426f8af8-8802-43ff-8757-195bbb3fecf9",
+              "leftValue": "={{ $('Save order').first().json.created && !$('Save order').first().json.blocked }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        2944,
+        80
+      ],
+      "id": "a7c8f700-5f03-498f-b8ea-189271af82fe",
+      "name": "Send verification?"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "leadgen",
+          "mode": "list",
+          "cachedResultName": "leadgen"
+        },
+        "table": {
+          "__rl": true,
+          "value": "orders",
+          "mode": "list",
+          "cachedResultName": "orders"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "id",
+              "value": "={{ $('Save order').first().json.id }}"
+            }
+          ]
+        },
+        "options": {
+          "outputColumns": [
+            "verification_token"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        3216,
+        64
+      ],
+      "id": "4ad626f4-5652-41dc-a36f-7a67f0d1a0c5",
+      "name": "Load verification token",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Load site and product').first().json.email_from_name }} <{{ $('Load site and product').first().json.email_from }}>",
+        "toEmail": "={{ $('Validate').first().json.order.email }}",
+        "subject": "Please confirm your email address",
+        "html": "=<p>Hello,</p>\n<p>thank you for your order {{ $('Save order').first().json.id }} at {{ $('Load site and product').first().json.site_name }}.</p>\n<p><a href=\"{{ $('Webhook').first().json.webhookUrl.replace(/orders$/, 'verify-email') }}?token={{ $json.verification_token }}\">Confirm your email address</a></p>\n<p>If the link does not work, copy this address into your browser:<br>\n{{ $('Webhook').first().json.webhookUrl.replace(/orders$/, 'verify-email') }}?token={{ $json.verification_token }}</p>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Load site and product').first().json.email_reply_to ?? '' }}"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3440,
+        64
+      ],
+      "id": "3cb380cb-146f-43ce-a2ce-7079b43b71e0",
+      "name": "Send an Email",
+      "webhookId": "958f0931-274e-4512-b0eb-b487af9b5e02",
+      "retryOnFail": true,
+      "credentials": {
+        "smtp": {
+          "id": "7S2DTYC5OznHPryB",
+          "name": "Mailpit"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- The email provider connected to the order's site; no row is written if there is none.\nINSERT INTO leadgen.provider_records (order_id, provider_id, type, external_id)\nSELECT o.id, pr.id, 'email_verification', $2\nFROM leadgen.orders o\nJOIN leadgen.site_providers sp ON sp.site_id = o.site_id AND sp.active\nJOIN leadgen.providers pr ON pr.id = sp.provider_id AND pr.active AND pr.type = 'email'\nWHERE o.id = $1\nON CONFLICT (order_id, type) DO NOTHING",
+        "options": {
+          "queryReplacement": "={{ [ $('Save order').first().json.id, $json.messageId ?? null ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        3664,
+        64
+      ],
+      "id": "01fe85cb-0f0a-41a7-8700-a5892f1fc57c",
+      "name": "Save verification record",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Load site and product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load site and product": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate": {
+      "main": [
+        [
+          {
+            "node": "Is valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save order": {
+      "main": [
+        [
+          {
+            "node": "Needs check?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs check?": {
+      "main": [
+        [
+          {
+            "node": "Check duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bad duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is valid?": {
+      "main": [
+        [
+          {
+            "node": "Save order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bad duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Mark bad duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "New order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark bad duplicate": {
+      "main": [
+        [
+          {
+            "node": "Duplicate order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check duplicate": {
+      "main": [
+        [
+          {
+            "node": "Bad duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Duplicate order": {
+      "main": [
+        []
+      ]
+    },
+    "New order": {
+      "main": [
+        [
+          {
+            "node": "Process now?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process now?": {
+      "main": [
+        [
+          {
+            "node": "Process order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send verification?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send verification?": {
+      "main": [
+        [
+          {
+            "node": "Load verification token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load verification token": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an Email": {
+      "main": [
+        [
+          {
+            "node": "Save verification record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

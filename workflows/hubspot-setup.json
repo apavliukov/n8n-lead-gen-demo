@@ -1,0 +1,83 @@
+{
+  "name": "HubSpot setup",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f4dc67b1-517d-4edd-96c7-1cfc359aaf44",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Custom properties the pipeline writes to. Run once per HubSpot account.\nconst text = (name, label) => ({ name, label, type: 'string', fieldType: 'text' });\nconst date = (name, label) => ({ name, label, type: 'date', fieldType: 'date' });\n\nconst objects = {\n  contacts: {\n    groupName: 'contactinformation',\n    properties: [\n      text('birth_place', 'Birth place'),\n      text('id_number', 'ID number'),\n      date('id_valid_until', 'ID valid until'),\n      text('iban', 'IBAN'),\n    ],\n  },\n  deals: {\n    groupName: 'dealinformation',\n    properties: [\n      text('order_number', 'Order number'),\n      text('order_email', 'Order email'),\n      text('product_name', 'Product name'),\n      text('source_domain', 'Source'),\n      text('client_ip', 'Client IP'),\n    ],\n  },\n};\n\n// One item per object type: the HTTP node runs once for each.\nreturn Object.entries(objects).map(([object, { groupName, properties }]) => ({\n  json: { object, inputs: properties.map((p) => ({ ...p, groupName })) },\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "a0b5bf0f-da4d-49c0-b66b-d2a6a19eafbe",
+      "name": "Properties"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hubapi.com/crm/v3/properties/{{ $json.object }}/batch/create",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { inputs: $json.inputs } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "dffed3f5-307e-4ccf-846f-aa2e7614028e",
+      "name": "Create properties",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "hyYoN0gJrnrmVzhy",
+          "name": "HubSpot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Properties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Properties": {
+      "main": [
+        [
+          {
+            "node": "Create properties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}
