@@ -29,7 +29,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.8,
       "position": [
-        224,
+        256,
         0
       ],
       "id": "d25e39f5-e2d1-4cf9-bbcb-149270911e7e",
@@ -69,7 +69,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.4,
       "position": [
-        448,
+        464,
         0
       ],
       "id": "110f07ec-c6b1-4698-9b25-b145dec5ce43",
@@ -115,7 +115,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        704,
+        720,
         -16
       ],
       "id": "4c008a57-2f1d-4a9f-aa58-e26b208dd4f3",
@@ -127,7 +127,7 @@
       "type": "n8n-nodes-base.limit",
       "typeVersion": 1,
       "position": [
-        928,
+        944,
         -16
       ],
       "id": "15b3d3aa-42e5-4bc9-950b-579c12c8abc9",
@@ -147,12 +147,95 @@
       "typeVersion": 1,
       "id": "19e9e598-2aa5-4140-b81d-52aae053bb21",
       "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Orders that ran out of attempts: nothing scheduled, not finished, and the last claim is stale.\n-- failed_at marks them as reported, so each order is announced once.\nUPDATE leadgen.orders o\nSET failed_at = now()\nFROM leadgen.sites s\nWHERE s.id = o.site_id\n  AND o.failed_at IS NULL\n  AND o.completed_at IS NULL\n  AND o.next_attempt_at IS NULL\n  AND NOT o.blocked\n  AND o.duplicate <> 2                                   -- 2 = bad duplicate\n  AND o.locked_at < now() - interval '10 minutes'\nRETURNING o.id AS order_id, o.email, o.attempts, s.name AS site_name",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        256,
+        256
+      ],
+      "id": "a87ee292-956f-4a1b-bd0f-53985169f899",
+      "name": "Failed orders",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "6544dafd-ac5e-4044-ba1b-f1a5047e6b6c",
+              "leftValue": "={{ $json.order_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        480,
+        256
+      ],
+      "id": "ae7f459c-ba30-4a66-bc34-57e1c7880041",
+      "name": "Has failed?"
+    },
+    {
+      "parameters": {
+        "operation": "sendRichMessage",
+        "chatId": "54130950",
+        "richMessageText": "=Order {{ $json.order_id }} failed after {{ $json.attempts }} attempts.<br>\nSite: {{ $json.site_name }}<br>\nCustomer: {{ $json.email }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        240
+      ],
+      "id": "0946d8c7-269a-426f-9a1f-75996660c0c8",
+      "name": "Alert",
+      "webhookId": "9df65379-c624-4fd0-b77b-880105739e29",
+      "credentials": {
+        "telegramApi": {
+          "id": "yoq8XjNIMz1ZVDSb",
+          "name": "Telegram account"
+        }
+      }
     }
   ],
   "connections": {
     "Schedule Trigger": {
       "main": [
         [
+          {
+            "node": "Failed orders",
+            "type": "main",
+            "index": 0
+          },
           {
             "node": "Due orders",
             "type": "main",
@@ -199,6 +282,28 @@
         [
           {
             "node": "Due orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Failed orders": {
+      "main": [
+        [
+          {
+            "node": "Has failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has failed?": {
+      "main": [
+        [
+          {
+            "node": "Alert",
             "type": "main",
             "index": 0
           }
