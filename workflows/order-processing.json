@@ -24,7 +24,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- Claim the order for this run. No row back means it is terminal or another run holds it.\nUPDATE leadgen.orders o\nSET locked_at = now()\nFROM leadgen.products p, leadgen.sites s\nWHERE o.id = $1\n  AND p.id = o.product_id\n  AND s.id = o.site_id\n  AND NOT o.blocked\n  AND o.duplicate <> 2                                                     -- 2 = bad duplicate\n  AND o.completed_at IS NULL\n  AND (o.locked_at IS NULL OR o.locked_at < now() - interval '10 minutes') -- a stale claim is a crashed run\nRETURNING o.id, o.email, o.phone, o.payload, o.meta, o.attempts, o.created_at,\n          p.name AS product_name, p.price,\n          p.hubspot_pipeline, p.hubspot_stage, p.hubspot_duplicate_stage,\n          s.duplicate_days,\n          EXISTS (SELECT 1 FROM leadgen.verified_emails v WHERE v.email = o.email) AS email_verified,\n          -- Providers connected to the site, keyed by type: {\"hubspot\": {\"id\": 1, \"settings\": {}}}\n          (SELECT coalesce(jsonb_object_agg(pr.type, jsonb_build_object('id', pr.id, 'settings', sp.settings)), '{}')\n           FROM leadgen.site_providers sp\n           JOIN leadgen.providers pr ON pr.id = sp.provider_id\n           WHERE sp.site_id = o.site_id AND sp.active AND pr.active) AS providers,\n          -- Steps that already succeeded for this order: [\"hubspot_contact\", \"hubspot_deal\"]\n          (SELECT coalesce(jsonb_agg(r.type), '[]')\n           FROM leadgen.provider_records r\n           WHERE r.order_id = o.id) AS done",
+        "query": "-- Claim the order for this run. No row back means it is terminal or another run holds it.\nUPDATE leadgen.orders o\nSET locked_at = now()\nFROM leadgen.products p, leadgen.sites s\nWHERE o.id = $1\n  AND p.id = o.product_id\n  AND s.id = o.site_id\n  AND NOT o.blocked\n  AND o.duplicate <> 2                                                     -- 2 = bad duplicate\n  AND o.completed_at IS NULL\n  AND (o.locked_at IS NULL OR o.locked_at < now() - interval '10 minutes') -- a stale claim is a crashed run\nRETURNING o.id, o.email, o.phone, o.payload, o.meta, o.attempts, o.created_at,\n          p.name AS product_name, p.price,\n          p.hubspot_pipeline, p.hubspot_stage, p.hubspot_duplicate_stage,\n          s.duplicate_days,\n          -- Providers connected to the site, keyed by type: {\"hubspot\": {\"id\": 1, \"settings\": {}}}\n          (SELECT coalesce(jsonb_object_agg(pr.type, jsonb_build_object('id', pr.id, 'settings', sp.settings)), '{}')\n           FROM leadgen.site_providers sp\n           JOIN leadgen.providers pr ON pr.id = sp.provider_id\n           WHERE sp.site_id = o.site_id AND sp.active AND pr.active) AS providers,\n          -- Steps that already succeeded for this order: [\"hubspot_contact\", \"hubspot_deal\"]\n          (SELECT coalesce(jsonb_agg(r.type), '[]')\n           FROM leadgen.provider_records r\n           WHERE r.order_id = o.id) AS done",
         "options": {
           "queryReplacement": "={{ [ $json.order_id ] }}"
         }
@@ -451,32 +451,6 @@
     },
     {
       "parameters": {
-        "method": "PATCH",
-        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.contact_id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "hubspotAppToken",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { properties: $('HubSpot data').first().json.contact } }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        2112,
-        -176
-      ],
-      "id": "8bd65ed5-0755-41f1-aab5-740c6f380a0d",
-      "name": "Update contact",
-      "credentials": {
-        "hubspotAppToken": {
-          "id": "hyYoN0gJrnrmVzhy",
-          "name": "HubSpot"
-        }
-      }
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "https://api.hubapi.com/crm/v3/objects/contacts",
         "authentication": "predefinedCredentialType",
@@ -489,7 +463,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        2112,
+        1968,
         112
       ],
       "id": "e5c99388-89f8-49a5-9ed7-1612dd60adff",
@@ -734,7 +708,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Maps the order to HubSpot contact and deal properties.\nconst order = $('Claim order').first().json;\nconst check = $('Check duplicate').first().json;\nconst form = order.payload;\n\n// DD.MM.YYYY -> YYYY-MM-DD, the format HubSpot date properties accept.\nconst isoDate = (value) => (value ? value.split('.').reverse().join('-') : undefined);\n// Host of the landing page the form was submitted from. The URL class is not available here.\nconst domain = (url) => String(url ?? '').match(/^https?:\\/\\/([^\\/?#]+)/)?.[1];\n\nreturn [{\n  json: {\n    contact_id: check.contact_id,\n    contact: {\n      firstname: form.first_name,\n      lastname: form.last_name,\n      phone: order.phone,\n      address: `${form.street} ${form.house_number}`,\n      zip: form.postal_code,\n      city: form.city,\n      date_of_birth: form.birth_date,\n      birth_place: form.birth_place,\n      id_number: form.id_number,\n      id_valid_until: isoDate(form.id_valid_until),\n      iban: form.iban,\n    },\n    deal: {\n      dealname: `${form.first_name} ${form.last_name}`,\n      amount: order.price,\n      pipeline: order.hubspot_pipeline,\n      dealstage: check.is_good_duplicate ? order.hubspot_duplicate_stage : order.hubspot_stage,\n      description: `Previous deal: ${check.last_deal_id ?? 'none'}`,\n      order_number: String(order.id),\n      order_email: order.email,\n      product_name: order.product_name,\n      source_domain: domain(form.original_url),\n      client_ip: order.meta.ip,\n    },\n  },\n}];"
+        "jsCode": "// Maps the order to HubSpot contact and deal properties.\n// The contact holds identity only and is never updated; everything a customer can change\n// between orders (address, bank account, id document, contact details) is a snapshot on the deal.\nconst order = $('Claim order').first().json;\nconst check = $('Check duplicate').first().json;\nconst form = order.payload;\n\n// DD.MM.YYYY -> YYYY-MM-DD, the format HubSpot date properties accept.\nconst isoDate = (value) => (value ? value.split('.').reverse().join('-') : undefined);\n// Host of the landing page the form was submitted from. The URL class is not available here.\nconst domain = (url) => String(url ?? '').match(/^https?:\\/\\/([^\\/?#]+)/)?.[1];\n\nreturn [{\n  json: {\n    contact_id: check.contact_id,\n    contact: {\n      firstname: form.first_name,\n      lastname: form.last_name,\n      phone: order.phone,\n      date_of_birth: form.birth_date,\n      birth_place: form.birth_place,\n    },\n    deal: {\n      dealname: `${form.first_name} ${form.last_name}`,\n      amount: order.price,\n      pipeline: order.hubspot_pipeline,\n      dealstage: check.is_good_duplicate ? order.hubspot_duplicate_stage : order.hubspot_stage,\n      description: `Previous deal: ${check.last_deal_id ?? 'none'}`,\n      order_number: String(order.id),\n      product_name: order.product_name,\n      source_domain: domain(form.original_url),\n      client_ip: order.meta.ip,\n      order_email: order.email,\n      order_phone: order.phone,\n      address: `${form.street} ${form.house_number}`,\n      postal_code: form.postal_code,\n      city: form.city,\n      iban: form.iban,\n      id_number: form.id_number,\n      id_valid_until: isoDate(form.id_valid_until),\n    },\n  },\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -759,7 +733,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        2352,
+        2336,
         -32
       ],
       "id": "df381fca-1dae-43d0-bb52-0b0e174bacdb",
@@ -770,40 +744,6 @@
           "name": "HubSpot"
         }
       }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 4
-          },
-          "conditions": [
-            {
-              "id": "b413b8d2-5217-4cc9-8f7b-034a97653d48",
-              "leftValue": "={{ $('Claim order').first().json.email_verified && $('Check duplicate').first().json.contact_matched_by_email }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.4,
-      "position": [
-        1872,
-        -48
-      ],
-      "id": "0ceb93d3-bdfd-4605-be82-b675b8822839",
-      "name": "Can update contact?"
     }
   ],
   "connections": {
@@ -891,7 +831,7 @@
       "main": [
         [
           {
-            "node": "Can update contact?",
+            "node": "Create deal",
             "type": "main",
             "index": 0
           }
@@ -899,17 +839,6 @@
         [
           {
             "node": "Create contact",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update contact": {
-      "main": [
-        [
-          {
-            "node": "Create deal",
             "type": "main",
             "index": 0
           }
@@ -954,24 +883,6 @@
         [
           {
             "node": "Save HubSpot result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Can update contact?": {
-      "main": [
-        [
-          {
-            "node": "Update contact",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Create deal",
             "type": "main",
             "index": 0
           }

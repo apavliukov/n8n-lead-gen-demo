@@ -44,13 +44,11 @@ for (const [name, [responses, expected]] of Object.entries(duplicates)) {
 test('duplicate check: prefers the contact that owns the order email', () => {
   const result = duplicateCheck({ contacts: [contact('1', 'other@example.com'), contact('2', 'Max@Example.com')], deals: [] });
   assert.equal(result.contact_id, '2');
-  assert.equal(result.contact_matched_by_email, true);
 });
 
-test('duplicate check: a phone-only match is not an email match', () => {
+test('duplicate check: falls back to a phone-only match', () => {
   const result = duplicateCheck({ contacts: [contact('1', 'other@example.com')], deals: [] });
   assert.equal(result.contact_id, '1');
-  assert.equal(result.contact_matched_by_email, false);
 });
 
 const payload = JSON.parse(readFileSync(new URL('../../test-payloads/valid-new.json', import.meta.url)));
@@ -98,18 +96,31 @@ const hubspotData = (order, check = {}) => run('order-processing', 'HubSpot data
 const form = { first_name: 'Max', last_name: 'Mustermann', street: 'Musterstr.', house_number: '1', postal_code: '10115',
   city: 'Berlin', birth_date: '1990-01-01', iban: 'DE00', original_url: 'https://landing.example/order?x=1' };
 
-test('hubspot data: maps a new order to the regular stage', () => {
-  const { contact, deal } = hubspotData({ payload: { ...form, id_valid_until: '01.01.2030' } });
+test('hubspot data: keeps only identity on the contact', () => {
+  const { contact } = hubspotData({ payload: { ...form, birth_place: 'Berlin' } });
+  assert.deepEqual(contact, {
+    firstname: 'Max', lastname: 'Mustermann', phone: '+49151000', date_of_birth: '1990-01-01', birth_place: 'Berlin',
+  });
+});
+
+test('hubspot data: puts the order snapshot on the deal', () => {
+  const { deal } = hubspotData({ payload: { ...form, id_number: 'L01', id_valid_until: '01.01.2030' } });
   assert.equal(deal.dealname, 'Max Mustermann');
   assert.equal(deal.dealstage, 'new');
   assert.equal(deal.source_domain, 'landing.example');
-  assert.equal(contact.address, 'Musterstr. 1');
-  assert.equal(contact.id_valid_until, '2030-01-01');
+  assert.equal(deal.order_email, 'max@example.com');
+  assert.equal(deal.order_phone, '+49151000');
+  assert.equal(deal.address, 'Musterstr. 1');
+  assert.equal(deal.postal_code, '10115');
+  assert.equal(deal.city, 'Berlin');
+  assert.equal(deal.iban, 'DE00');
+  assert.equal(deal.id_number, 'L01');
+  assert.equal(deal.id_valid_until, '2030-01-01');
 });
 
 test('hubspot data: sends a good duplicate to the duplicate stage', () => {
-  const { deal, contact } = hubspotData({ payload: form }, { is_good_duplicate: true, last_deal_id: '77' });
+  const { deal } = hubspotData({ payload: form }, { is_good_duplicate: true, last_deal_id: '77' });
   assert.equal(deal.dealstage, 'dup');
   assert.equal(deal.description, 'Previous deal: 77');
-  assert.equal(contact.id_valid_until, undefined); // product without id document fields
+  assert.equal(deal.id_valid_until, undefined); // product without id document fields
 });
