@@ -36,6 +36,8 @@ services:
       - POSTGRES_DB=n8n
       - POSTGRES_USER=n8n
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5433:5432" # for a database client over an SSH tunnel; 5432 on a Synology host belongs to DSM's own Postgres
     volumes:
       - postgres_data:/var/lib/postgresql # postgres 18+ images keep data in a versioned subdirectory
     healthcheck:
@@ -44,6 +46,16 @@ services:
       timeout: 5s
       retries: 10
     mem_limit: 256m
+
+  # Development mail catcher: accepts everything on SMTP 1025 and delivers nothing.
+  # Starts only with COMPOSE_PROFILES=dev in .env; production uses a real SMTP provider instead.
+  mailpit:
+    image: axllent/mailpit:latest
+    profiles: [dev]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025" # web UI, no auth: reach it through an SSH tunnel or the reverse proxy
+    mem_limit: 64m
 
 volumes:
   n8n_data:
