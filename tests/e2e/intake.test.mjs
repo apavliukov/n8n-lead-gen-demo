@@ -1,6 +1,6 @@
 // Black-box tests of the order intake webhook on a running n8n instance.
 // Run with scripts/test.sh. Every order gets a fresh idempotency key, email and phone,
-// so the suite can be repeated; created orders use the @autotest.invalid domain.
+// so the suite can be repeated; created orders use autotest-...@example.com addresses.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -12,7 +12,7 @@ const base = JSON.parse(readFileSync(new URL('../../test-payloads/valid-new.json
 const order = (overrides = {}) => ({
   ...base,
   idempotency_key: randomUUID(),
-  email: `${randomUUID()}@autotest.invalid`,
+  email: `autotest-${randomUUID()}@example.com`,
   phone: `+49151${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`,
   ...overrides,
 });
