@@ -2,8 +2,8 @@
 -- In production these tables are maintained by the back-office app; n8n only reads them.
 SET search_path TO leadgen;
 
-INSERT INTO sites (id, token, name, email_from, email_from_name)
-VALUES (1, '11111111-1111-4111-8111-111111111111', 'Demo landing', 'orders@example.com', 'Demo Shop')
+INSERT INTO sites (id, token, name, email_from, email_from_name, email_verified_url)
+VALUES (1, '11111111-1111-4111-8111-111111111111', 'Demo landing', 'orders@example.com', 'Demo Shop', 'https://example.com/?email-verified')
 ON CONFLICT (id) DO NOTHING;
 
 -- 'default' and 'appointmentscheduled' are the ids of HubSpot's built-in sales pipeline and its first stage.

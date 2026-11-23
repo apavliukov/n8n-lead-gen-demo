@@ -1,0 +1,319 @@
+{
+  "name": "Email verification",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "verify-email",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "024c7949-ae65-4d51-9f95-061036cf2829",
+      "name": "Webhook",
+      "webhookId": "b089bf8d-0ec9-41dd-b73b-25b5a358ebd4"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "7e86c8e9-b985-4bd9-9a4e-8759de1da9ab",
+              "leftValue": "={{ $json.query.token ?? '' }}",
+              "rightValue": "^[0-9a-fA-F-]{36}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "9e6ae852-c707-4f04-b84c-226ccfa9c987",
+      "name": "Token format ok?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Mark the address verified and make its waiting orders due now. Always returns one row:\n-- email is NULL for an unknown token, order_ids lists the released orders, oldest first.\nWITH clicked AS (\n    SELECT o.email, s.email_verified_url\n    FROM leadgen.orders o\n    JOIN leadgen.sites s ON s.id = o.site_id\n    WHERE o.verification_token = $1::uuid\n), verified AS (\n    INSERT INTO leadgen.verified_emails (email)\n    SELECT email FROM clicked\n    ON CONFLICT (email) DO NOTHING\n), released AS (\n    UPDATE leadgen.orders o\n    SET next_attempt_at = now()\n    FROM clicked\n    WHERE o.email = clicked.email\n      AND NOT o.blocked\n      AND o.duplicate <> 2              -- 2 = bad duplicate\n      AND o.completed_at IS NULL\n      AND o.next_attempt_at > now()     -- still waiting for the click or the timeout\n    RETURNING o.id\n)\nSELECT (SELECT email FROM clicked) AS email,\n       (SELECT email_verified_url FROM clicked) AS redirect_url,\n       (SELECT coalesce(array_agg(id ORDER BY id), '{}') FROM released) AS order_ids",
+        "options": {
+          "queryReplacement": "={{ [ $json.query.token ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        480,
+        -16
+      ],
+      "id": "cca0d7c5-11f9-4db4-aa1e-8a0d95d32072",
+      "name": "Verify email",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "408d0292-3e76-4393-affe-c1c0fdb15994",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        704,
+        -16
+      ],
+      "id": "c42087f8-d3bc-490c-9eeb-9f6d448a1079",
+      "name": "Token found?"
+    },
+    {
+      "parameters": {
+        "respondWith": "redirect",
+        "redirectURL": "={{ $json.redirect_url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        928,
+        -32
+      ],
+      "id": "e570d468-7e89-49c4-8337-f0fa4bf22cda",
+      "name": "Verified"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><title>Link is not valid</title></head>\n<body style=\"font-family: sans-serif; text-align: center; margin-top: 15vh\">\n  <h1>Link is not valid</h1>\n  <p>This confirmation link is not valid.</p>\n</body>\n</html>",
+        "options": {
+          "responseCode": 404,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              },
+              {
+                "name": "charset",
+                "value": "utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        928,
+        256
+      ],
+      "id": "5d2cd3bb-fdea-463d-9c82-d3e643b77291",
+      "name": "Invalid link"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "d3c657c5-b74b-4758-b6f6-d253cadda69d",
+              "leftValue": "={{ $('Verify email').first().json.order_ids.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1152,
+        -32
+      ],
+      "id": "81cb3dde-ed73-4d94-bf84-91f94fd29263",
+      "name": "Has waiting order?"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "xkombxDshfrFbgWY",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/xkombxDshfrFbgWY",
+          "cachedResultName": "Order processing"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order_id": "={{ $('Verify email').first().json.order_ids[0] }}"
+          },
+          "matchingColumns": [
+            "order_id"
+          ],
+          "schema": [
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1408,
+        -48
+      ],
+      "id": "dd60fa69-85dd-4f2f-a6cf-07408b56309c",
+      "name": "Process order"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Token format ok?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token format ok?": {
+      "main": [
+        [
+          {
+            "node": "Verify email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify email": {
+      "main": [
+        [
+          {
+            "node": "Token found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token found?": {
+      "main": [
+        [
+          {
+            "node": "Verified",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verified": {
+      "main": [
+        [
+          {
+            "node": "Has waiting order?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has waiting order?": {
+      "main": [
+        [
+          {
+            "node": "Process order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

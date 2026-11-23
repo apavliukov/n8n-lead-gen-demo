@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS sites (
     email_from      text NOT NULL,
     email_from_name text NOT NULL,
     email_reply_to  text,
+    email_verified_url text NOT NULL,           -- landing page shown after the verification link is clicked
     duplicate_days  integer NOT NULL DEFAULT 30    -- a previous deal younger than this makes a duplicate
 );
 
