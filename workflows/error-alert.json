@@ -1,0 +1,58 @@
+{
+  "id": "Lfzblgzr3SwBwpsE",
+  "name": "Error alert",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "43ec954b-b9de-46e0-8bf3-8c1c2513d1b1",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "chatId": "54130950",
+        "text": "=Workflow \"{{ $json.workflow.name }}\" failed Node: {{ $json.execution?.lastNodeExecuted ?? 'trigger' }} \nError: {{ ($json.execution?.error?.message ?? $json.trigger?.error?.message ?? 'unknown').slice(0, 500) }} {{ ($json.execution?.error?.description ?? '').slice(0, 1000) }} {{ $json.execution?.url ?? '' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "f5c6f16d-ac86-4252-8400-fe09173bab09",
+      "name": "Alert",
+      "webhookId": "f2030aba-b977-442a-b7cd-adee75d3d554",
+      "credentials": {
+        "telegramApi": {
+          "id": "yoq8XjNIMz1ZVDSb",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

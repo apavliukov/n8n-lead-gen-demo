@@ -37,6 +37,7 @@ flowchart TD
 | Order processing | called by the other three | Claim the order, then run each step once: duplicate check, HubSpot, email, Meta |
 | Duplicate check | called by intake and processing | Find the customer in HubSpot by email or phone and classify the latest deal |
 | Scheduler | every 5 minutes | Process due orders in batches, alert about orders that ran out of attempts |
+| Error alert | failed execution of any workflow above | Report the workflow, node, error and execution link to Telegram |
 | HubSpot setup | manual, once per account | Create the custom deal and contact properties |
 
 ## Design decisions
@@ -55,6 +56,10 @@ retry skips the steps that already succeeded.
 (15 min, 1 h, 3 h, 12 h, 24 h). A successful run clears it; a failed or crashed run needs no
 cleanup, the order simply comes due again. After the sixth attempt the order is reported to
 Telegram once.
+
+**Two kinds of alerts.** Every failed execution is reported at once by a shared error
+workflow, with the node and the error text. An order that ran out of attempts is reported
+separately, once, as the case that needs a person.
 
 **HubSpot is the only source of truth for duplicates.** A previous deal younger than the
 site's threshold (30 days) makes a bad duplicate that is never processed; an older one makes
@@ -165,5 +170,7 @@ provider calls are covered only by the e2e suite and manual checks.
   executions.
 - **A failed alert is not retried.** An order is marked as reported before the Telegram
   message is sent.
+- **Error alerts are not deduplicated.** An outage of a provider produces one message per
+  failed execution.
 - **No test environment.** End-to-end tests run against the development instance and the
   real HubSpot account.
