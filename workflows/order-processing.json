@@ -440,60 +440,6 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "UJvUegYOePAThJH3",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/UJvUegYOePAThJH3",
-          "cachedResultName": "Step: HubSpot"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "order": "={{ $('Claim order').first().json }}",
-            "check": "={{ $('Check duplicate').first().json }}"
-          },
-          "matchingColumns": [
-            "order"
-          ],
-          "schema": [
-            {
-              "id": "order",
-              "displayName": "order",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "object",
-              "removed": false
-            },
-            {
-              "id": "check",
-              "displayName": "check",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "object",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.4,
-      "position": [
-        1424,
-        64
-      ],
-      "id": "ac74ae4d-2d12-4833-b06b-9e7aafac8f78",
-      "name": "Hubspot"
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
           "value": "w7nsUDamiw3MRqbI",
           "mode": "list",
           "cachedResultUrl": "/workflow/w7nsUDamiw3MRqbI",
@@ -839,6 +785,60 @@
       ],
       "id": "ab642581-3401-48ff-8f92-0fe7cf5e48a1",
       "name": "Deal created?"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "UJvUegYOePAThJH3",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/UJvUegYOePAThJH3",
+          "cachedResultName": "Step: HubSpot"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order": "={{ $('Claim order').first().json }}",
+            "check": "={{ $('Check duplicate').first().json }}"
+          },
+          "matchingColumns": [
+            "order"
+          ],
+          "schema": [
+            {
+              "id": "order",
+              "displayName": "order",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            },
+            {
+              "id": "check",
+              "displayName": "check",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1424,
+        64
+      ],
+      "id": "ac74ae4d-2d12-4833-b06b-9e7aafac8f78",
+      "name": "HubSpot"
     }
   ],
   "connections": {
@@ -931,17 +931,6 @@
         ]
       ]
     },
-    "Hubspot": {
-      "main": [
-        [
-          {
-            "node": "Order email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Check duplicate": {
       "main": [
         [
@@ -964,7 +953,7 @@
         ],
         [
           {
-            "node": "Hubspot",
+            "node": "HubSpot",
             "type": "main",
             "index": 0
           }
@@ -983,6 +972,17 @@
         [
           {
             "node": "Check duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot": {
+      "main": [
+        [
+          {
+            "node": "Order email",
             "type": "main",
             "index": 0
           }
