@@ -64,7 +64,9 @@ separately, once, as the case that needs a person.
 **HubSpot is the only source of truth for duplicates.** A previous deal younger than the
 site's threshold (30 days) makes a bad duplicate that is never processed; an older one makes
 a good duplicate whose deal goes to a separate stage. Orders of one customer are processed
-one at a time, at least a minute apart, so the second one can find the first one's deal.
+one at a time, at least a minute apart, so the second one can find the first one's deal:
+HubSpot's search shows a new deal 5 to 7 seconds after it is created
+(`scripts/hubspot-lag.mjs` measures it).
 
 **The contact is identity, the deal is a snapshot.** A HubSpot contact is created once and
 never updated by the pipeline. Everything a customer can enter differently per order
@@ -95,6 +97,7 @@ scripts/sql.sh             run a SQL statement on the server database
 scripts/order.sh           send a test order with fresh data
 scripts/test.sh            run the unit or e2e tests
 scripts/stand.sh           start, test and remove the local test stand
+scripts/hubspot-lag.mjs    measure how fast HubSpot's search sees a new deal
 tests/unit/                Code nodes from the exports, run without n8n
 tests/e2e/                 requests against a running instance
 tests/stub/                stand-in for HubSpot, Meta and Telegram
@@ -187,6 +190,9 @@ tests prove that a customer's orders are spaced out, not that one minute is enou
   the deal carries the email and phone of the order.
 - **Order numbers can have gaps.** Two simultaneous requests with the same new idempotency
   key can consume a sequence value.
+- **Two orders claimed at the same instant do not see each other.** The one-at-a-time rule
+  is a query condition, not a lock, so two simultaneous requests of one customer can both
+  be processed.
 - **Customers are told apart by email in the queue.** Orders with different addresses and
   the same phone can be processed at the same time.
 - **Execution history stores payloads.** n8n keeps the input and output of every node,

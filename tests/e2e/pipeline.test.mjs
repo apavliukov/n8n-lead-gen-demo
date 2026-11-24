@@ -210,3 +210,18 @@ test('spaces out the orders of one customer so the second is caught as a duplica
   assert.equal(order(second).duplicate, 2);
   assert.equal(await dealOf(second), undefined);
 });
+
+test('does not start an order while another one of the customer is in progress', { skip }, async () => {
+  const payload = customer();
+  const first = (await submit(payload)).order_id; // unverified, waits for the click
+  run(`UPDATE leadgen.orders SET locked_at = now() WHERE id = ${first}`); // as if it were being processed
+  verify(payload.email);
+
+  const second = (await submit(payload)).order_id; // verified address: intake starts processing at once
+  await sleep(1500);
+  assert.equal(order(second).attempts, 0, 'the claim is refused');
+
+  run(`UPDATE leadgen.orders SET locked_at = NULL WHERE id = ${first}`);
+  await schedulerPass();
+  assert.ok(order(second).completed_at, 'the scheduler picks the order up later');
+});
