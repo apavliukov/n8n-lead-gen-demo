@@ -83,6 +83,7 @@ The repository holds no secrets.
 
 ```
 compose.yaml               n8n + Postgres (+ Mailpit with the dev profile)
+compose.test.yaml          disposable local test stand with stubbed providers
 db/schema.sql              leadgen schema, idempotent, applied on every deploy
 db/seed.sql                demo site, products and providers
 workflows/                 workflow exports, one JSON file each
@@ -93,8 +94,10 @@ scripts/import.sh          workflows/ -> n8n (through the n8n CLI in the contain
 scripts/sql.sh             run a SQL statement on the server database
 scripts/order.sh           send a test order with fresh data
 scripts/test.sh            run the unit or e2e tests
+scripts/stand.sh           start, test and remove the local test stand
 tests/unit/                Code nodes from the exports, run without n8n
 tests/e2e/                 requests against a running instance
+tests/stub/                stand-in for HubSpot, Meta and Telegram
 test-payloads/             example order payloads
 ```
 
@@ -115,7 +118,9 @@ front of port 5678, and locally `jq`, `curl` and Node 24.
    `N8N_API_KEY` into a local `.env`.
 4. **Credentials and workflows.** Copy `credentials.example.json` to `credentials.json`,
    fill in the secrets and run `scripts/import.sh --credentials`. Publish the workflows in
-   the editor; imported workflows arrive unpublished.
+   the editor; imported workflows arrive unpublished. Publish `Duplicate check` first, then
+   `Order processing`, then the rest: n8n refuses to publish a workflow before the
+   sub-workflows it calls.
 5. **HubSpot.** Run the `HubSpot setup` workflow once, create a "Duplicate" deal stage and
    put the pipeline and stage ids into `leadgen.products`.
 6. **Meta.** Put the pixel id (and, for testing, a `test_event_code`) into
@@ -143,14 +148,32 @@ scripts/order.sh -r         # replay the previous request (same idempotency key)
 ## Tests
 
 ```sh
-scripts/test.sh        # unit: Code nodes from workflows/*.json with canned inputs, offline
-scripts/test.sh e2e    # real requests to the published intake webhook
+scripts/test.sh          # unit: Code nodes from workflows/*.json with canned inputs, offline
+scripts/stand.sh up      # start a throwaway stand on localhost with stubbed providers
+scripts/stand.sh test    # e2e: the whole pipeline on the stand
+scripts/stand.sh down
+scripts/test.sh e2e      # the intake part of the e2e suite against the instance from .env
 ```
 
 The unit tests load the JavaScript of the Code nodes straight from the exported workflows
 and replace the neighbouring nodes with canned outputs, such as a HubSpot search response.
-They cover validation, duplicate classification and the HubSpot mapping. Wiring, SQL and
-provider calls are covered only by the e2e suite and manual checks.
+They cover validation, duplicate classification and the HubSpot mapping.
+
+The test stand (`compose.test.yaml`) is a fresh n8n with its own Postgres, Mailpit and a
+small stub server that plays HubSpot, Meta and Telegram. `scripts/stand.sh up` applies the
+schema and the seed, imports the exports with the provider hosts pointed at the stub and
+publishes them, so every run also proves that the repository installs from scratch. The e2e
+tests post orders and then check the database, the mailbox and the requests the stub
+received: full processing, the verification click, both kinds of duplicates, a provider
+failure with its retry schedule and error alert. Needs only Docker, `jq` and Node.
+
+The same two suites run in GitHub Actions on every push.
+
+Not covered: the scheduler (retries and the two-hour timeout are driven by a 5-minute
+schedule) and the real provider APIs, whose behaviour the stub only imitates. In particular,
+the stub finds a new deal at once, while HubSpot's search index lags behind by seconds: the
+duplicate tests prove the classification, not the one-minute spacing between a customer's
+orders that covers this lag.
 
 ## Known limitations
 
@@ -172,5 +195,3 @@ provider calls are covered only by the e2e suite and manual checks.
   message is sent.
 - **Error alerts are not deduplicated.** An outage of a provider produces one message per
   failed execution.
-- **No test environment.** End-to-end tests run against the development instance and the
-  real HubSpot account.
