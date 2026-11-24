@@ -16,13 +16,13 @@ const run = (workflow, node, nodes, input = {}) => {
 
 const daysAgo = (days) => new Date(Date.now() - days * 86400000).toISOString();
 
-const duplicateCheck = ({ contacts = [], deals }) => run('duplicate-check', 'Result', {
-  'When Executed by Another Workflow': { email: 'max@example.com', phone: '+49151000', duplicate_days: 30 },
+const duplicateCheck = ({ contacts = [], deals, order_id }) => run('duplicate-check', 'Result', {
+  'When Executed by Another Workflow': { email: 'max@example.com', phone: '+49151000', duplicate_days: 30, order_id },
   'Find contact': { total: contacts.length, results: contacts },
   ...(deals && { 'Find latest deal': { results: deals } }),
 });
 const contact = (id, email) => ({ id, properties: { email } });
-const deal = (id, days) => ({ id, properties: { createdate: daysAgo(days) } });
+const deal = (id, days, order_number = '1') => ({ id, properties: { createdate: daysAgo(days), order_number } });
 
 // name -> [canned HubSpot responses, expected duplicate kind: 0 none, 1 good, 2 bad]
 const duplicates = {
@@ -49,6 +49,26 @@ test('duplicate check: prefers the contact that owns the order email', () => {
 test('duplicate check: falls back to a phone-only match', () => {
   const result = duplicateCheck({ contacts: [contact('1', 'other@example.com')], deals: [] });
   assert.equal(result.contact_id, '1');
+});
+
+test('duplicate check: a retry recognizes the deal of its own order', () => {
+  const result = duplicateCheck({ order_id: '1000050', contacts: [contact('1', 'max@example.com')], deals: [deal('9', 0, '1000050')] });
+  assert.equal(result.own_deal_id, '9');
+  assert.equal(result.duplicate, 0);
+  assert.equal(result.last_deal_id, null);
+});
+
+test('duplicate check: the own deal does not hide a previous one', () => {
+  const result = duplicateCheck({ order_id: '1000050', contacts: [contact('1', 'max@example.com')], deals: [deal('9', 0, '1000050'), deal('8', 40)] });
+  assert.equal(result.own_deal_id, '9');
+  assert.equal(result.duplicate, 1);
+  assert.equal(result.last_deal_id, '8');
+});
+
+test('duplicate check: without an order id every deal counts', () => {
+  const result = duplicateCheck({ contacts: [contact('1', 'max@example.com')], deals: [deal('9', 0, '1000050')] });
+  assert.equal(result.own_deal_id, null);
+  assert.equal(result.duplicate, 2);
 });
 
 const payload = JSON.parse(readFileSync(new URL('../../test-payloads/valid-new.json', import.meta.url)));

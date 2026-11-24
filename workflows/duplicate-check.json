@@ -1,4 +1,5 @@
 {
+  "id": "w7nsUDamiw3MRqbI",
   "name": "Duplicate check",
   "nodes": [
     {
@@ -14,6 +15,9 @@
             {
               "name": "duplicate_days",
               "type": "number"
+            },
+            {
+              "name": "order_id"
             }
           ]
         }
@@ -95,7 +99,7 @@
         "nodeCredentialType": "hubspotAppToken",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { filterGroups: [ { filters: [ { propertyName: 'associations.contact', operator: 'IN', values: $json.results.map(c => c.id) } ] } ], sorts: [ { propertyName: 'createdate', direction: 'DESCENDING' } ], properties: ['createdate', 'dealname'], limit: 1 } }}",
+        "jsonBody": "={{ { filterGroups: [ { filters: [ { propertyName: 'associations.contact', operator: 'IN', values: $json.results.map(c => c.id) } ] } ], sorts: [ { propertyName: 'createdate', direction: 'DESCENDING' } ], properties: ['createdate', 'dealname', 'order_number'], limit: 5 } }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -116,7 +120,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const DUPLICATE = { NONE: 0, GOOD: 1, BAD: 2 };  // 0 no, 1 good (previous deal older than the threshold), 2 bad (recent deal)\nconst input = $('When Executed by Another Workflow').first().json;\nconst contacts = $('Find contact').first().json.results ?? [];\n// The deal search is skipped when no contact was found.\nconst deal = $('Find latest deal').isExecuted\n  ? ($('Find latest deal').first().json.results ?? [])[0] ?? null\n  : null;\n\nlet duplicate = DUPLICATE.NONE;\nif (deal) {\n  const ageDays = (Date.now() - new Date(deal.properties.createdate).getTime()) / 86400000;\n  duplicate = ageDays < input.duplicate_days ? DUPLICATE.BAD : DUPLICATE.GOOD;\n}\n\n// Prefer the contact that owns the order email; a phone-only match is a weaker identity.\nconst byEmail = contacts.find((c) => c.properties.email?.toLowerCase() === input.email);\nconst contact = byEmail ?? contacts[0] ?? null;\n\nreturn [{\n  json: {\n    contact_id: contact?.id ?? null,\n    duplicate,\n    is_bad_duplicate: duplicate === DUPLICATE.BAD,\n    is_good_duplicate: duplicate === DUPLICATE.GOOD,\n    last_deal_id: deal?.id ?? null,\n    last_deal_at: deal?.properties.createdate ?? null,\n  },\n}];"
+        "jsCode": "const DUPLICATE = { NONE: 0, GOOD: 1, BAD: 2 };  // 0 no, 1 good (previous deal older than the threshold), 2 bad (recent deal)\nconst input = $('When Executed by Another Workflow').first().json;\nconst contacts = $('Find contact').first().json.results ?? [];\n// The deal search is skipped when no contact was found.\nconst deals = $('Find latest deal').isExecuted\n  ? $('Find latest deal').first().json.results ?? []\n  : [];\n\n// A retry after a crash between \"create deal\" and \"save result\" finds the deal of this very order.\n// It must be recognized as ours, not counted as a previous deal of the customer.\nconst own = input.order_id\n  ? deals.find((d) => d.properties.order_number === String(input.order_id))\n  : undefined;\nconst deal = deals.find((d) => d !== own) ?? null;\n\nlet duplicate = DUPLICATE.NONE;\nif (deal) {\n  const ageDays = (Date.now() - new Date(deal.properties.createdate).getTime()) / 86400000;\n  duplicate = ageDays < input.duplicate_days ? DUPLICATE.BAD : DUPLICATE.GOOD;\n}\n\n// Prefer the contact that owns the order email; a phone-only match is a weaker identity.\nconst byEmail = contacts.find((c) => c.properties.email?.toLowerCase() === input.email);\nconst contact = byEmail ?? contacts[0] ?? null;\n\nreturn [{\n  json: {\n    contact_id: contact?.id ?? null,\n    duplicate,\n    is_bad_duplicate: duplicate === DUPLICATE.BAD,\n    is_good_duplicate: duplicate === DUPLICATE.GOOD,\n    last_deal_id: deal?.id ?? null,\n    last_deal_at: deal?.properties.createdate ?? null,\n    own_deal_id: own?.id ?? null,\n  },\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
