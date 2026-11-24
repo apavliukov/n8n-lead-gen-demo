@@ -36,7 +36,7 @@ flowchart TD
 | Email verification | `GET /webhook/verify-email` | Mark the address verified, release its waiting orders, redirect to the site's page |
 | Order processing | called by the other three | Claim the order, then run each step once: duplicate check, HubSpot, email, Meta |
 | Duplicate check | called by intake and processing | Find the customer in HubSpot by email or phone and classify the latest deal |
-| Scheduler | every 5 minutes | Process due orders in batches, alert about orders that ran out of attempts |
+| Scheduler | every 5 minutes, or `POST /webhook/scheduler/run` with a key | Process due orders in batches, alert about orders that ran out of attempts |
 | Error alert | failed execution of any workflow above | Report the workflow, node, error and execution link to Telegram |
 | HubSpot setup | manual, once per account | Create the custom deal and contact properties |
 
@@ -165,15 +165,16 @@ schema and the seed, imports the exports with the provider hosts pointed at the 
 publishes them, so every run also proves that the repository installs from scratch. The e2e
 tests post orders and then check the database, the mailbox and the requests the stub
 received: full processing, the verification click, both kinds of duplicates, a provider
-failure with its retry schedule and error alert. Needs only Docker, `jq` and Node.
+failure with its retry schedule and error alert. Scheduler behaviour is tested through its
+second trigger, a key-protected webhook that runs one pass and answers when it is done: the
+two-hour timeout, a retry, the single alert for an exhausted order and the spacing between
+one customer's orders. Needs only Docker, `jq` and Node.
 
 The same two suites run in GitHub Actions on every push.
 
-Not covered: the scheduler (retries and the two-hour timeout are driven by a 5-minute
-schedule) and the real provider APIs, whose behaviour the stub only imitates. In particular,
+Not covered: the real provider APIs, whose behaviour the stub only imitates. In particular,
 the stub finds a new deal at once, while HubSpot's search index lags behind by seconds: the
-duplicate tests prove the classification, not the one-minute spacing between a customer's
-orders that covers this lag.
+tests prove that a customer's orders are spaced out, not that one minute is enough.
 
 ## Known limitations
 

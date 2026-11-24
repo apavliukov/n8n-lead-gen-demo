@@ -35,10 +35,18 @@ const sql = (query) => {
   );
   return JSON.parse(out);
 };
-const verify = (email) => {
+const run = (statement) => {
   execFileSync('docker', ['compose', '-f', 'compose.test.yaml', 'exec', '-T', 'postgres', 'psql', '-U', 'n8n',
-    '-d', 'n8n', '-qc', `INSERT INTO leadgen.verified_emails (email) VALUES ('${email}')`]);
+    '-d', 'n8n', '-qc', statement]);
 };
+const verify = (email) => run(`INSERT INTO leadgen.verified_emails (email) VALUES ('${email}')`);
+// One scheduler pass; the webhook answers when every batch has been processed.
+const schedulerPass = async () => {
+  const res = await fetch(`${N8N_URL}/webhook/scheduler/run`, { method: 'POST', headers: { 'X-Scheduler-Key': 'test' } });
+  assert.equal(res.status, 200);
+};
+// What a crashed or failed run leaves behind once its lock has gone stale.
+const STALE_LOCK = "locked_at = now() - interval '11 minutes'";
 
 // Processing runs after the webhook has answered, so results are polled for.
 const eventually = async (probe, what) => {
@@ -146,4 +154,59 @@ test('schedules a retry and alerts when a provider rejects the order', { skip },
   assert.equal(row.attempts, 1);
   assert.ok(new Date(row.next_attempt_at) > new Date(Date.now() + 10 * 60000), 'next attempt is about 15 minutes away');
   assert.deepEqual(steps(id), []);
+});
+
+test('refuses a scheduler pass without the key', { skip }, async () => {
+  const res = await fetch(`${N8N_URL}/webhook/scheduler/run`, { method: 'POST' });
+  assert.equal(res.status, 403);
+});
+
+test('processes an unverified order when its waiting time is over', { skip }, async () => {
+  const { order_id: id } = await submit(customer());
+  await schedulerPass();
+  assert.equal(order(id).completed_at, null, 'not due yet');
+
+  run(`UPDATE leadgen.orders SET next_attempt_at = now() WHERE id = ${id}`);
+  await schedulerPass();
+  assert.ok(order(id).completed_at);
+  assert.ok(await dealOf(id));
+});
+
+test('retries a failed order and reports it once when attempts run out', { skip }, async () => {
+  const payload = customer({ email: `autotest-${randomUUID()}@autotest.invalid` });
+  verify(payload.email);
+  const { order_id: id } = await submit(payload);
+  await eventually(() => order(id).attempts === 1, 'the first attempt');
+
+  run(`UPDATE leadgen.orders SET next_attempt_at = now(), ${STALE_LOCK} WHERE id = ${id}`);
+  await schedulerPass();
+  const retried = order(id);
+  assert.equal(retried.attempts, 2);
+  assert.ok(new Date(retried.next_attempt_at) > new Date(Date.now() + 50 * 60000), 'second backoff step is an hour');
+  assert.equal(retried.failed_at, null);
+
+  // Out of attempts: nothing scheduled and the last lock is stale.
+  run(`UPDATE leadgen.orders SET next_attempt_at = NULL, ${STALE_LOCK} WHERE id = ${id}`);
+  await schedulerPass();
+  await schedulerPass();
+  assert.ok(order(id).failed_at);
+  const alerts = (await stubRequests(/sendMessage$/)).filter((r) => r.body.text.startsWith(`Order ${id} failed`));
+  assert.equal(alerts.length, 1, 'reported once across two passes');
+  assert.equal(order(id).attempts, 2, 'no further attempts');
+});
+
+test('spaces out the orders of one customer so the second is caught as a duplicate', { skip }, async () => {
+  const payload = customer();
+  const first = (await submit(payload)).order_id;
+  const second = (await submit(payload)).order_id;
+  run(`UPDATE leadgen.orders SET next_attempt_at = now() WHERE id IN (${first}, ${second})`);
+
+  await schedulerPass();
+  assert.ok(order(first).completed_at, 'the oldest order goes first');
+  assert.equal(order(second).attempts, 0, 'the next one waits while the first deal may not be searchable');
+
+  run(`UPDATE leadgen.orders SET completed_at = now() - interval '2 minutes' WHERE id = ${first}`);
+  await schedulerPass();
+  assert.equal(order(second).duplicate, 2);
+  assert.equal(await dealOf(second), undefined);
 });

@@ -30,7 +30,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.8,
       "position": [
-        256,
+        304,
         0
       ],
       "id": "d25e39f5-e2d1-4cf9-bbcb-149270911e7e",
@@ -70,7 +70,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.4,
       "position": [
-        464,
+        512,
         0
       ],
       "id": "110f07ec-c6b1-4698-9b25-b145dec5ce43",
@@ -116,7 +116,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        688,
+        736,
         -16
       ],
       "id": "4c008a57-2f1d-4a9f-aa58-e26b208dd4f3",
@@ -128,7 +128,7 @@
       "type": "n8n-nodes-base.limit",
       "typeVersion": 1,
       "position": [
-        912,
+        960,
         -16
       ],
       "id": "15b3d3aa-42e5-4bc9-950b-579c12c8abc9",
@@ -158,8 +158,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.8,
       "position": [
-        256,
-        256
+        304,
+        224
       ],
       "id": "a87ee292-956f-4a1b-bd0f-53985169f899",
       "name": "Failed orders",
@@ -198,8 +198,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.4,
       "position": [
-        464,
-        256
+        512,
+        224
       ],
       "id": "ae7f459c-ba30-4a66-bc34-57e1c7880041",
       "name": "Has failed?"
@@ -213,8 +213,8 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        688,
-        240
+        736,
+        208
       ],
       "id": "0946d8c7-269a-426f-9a1f-75996660c0c8",
       "name": "Alert",
@@ -223,6 +223,31 @@
         "telegramApi": {
           "id": "yoq8XjNIMz1ZVDSb",
           "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "scheduler/run",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "responseData": "noData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        224
+      ],
+      "id": "245789e4-c010-4b59-ac72-1169e2cd3457",
+      "name": "Run now",
+      "webhookId": "4a5e3a75-2dd1-4b38-ae23-afcced9e1c8d",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "z1iZAxeiFHFV5tkc",
+          "name": "Scheduler trigger"
         }
       }
     }
@@ -304,6 +329,22 @@
         [
           {
             "node": "Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run now": {
+      "main": [
+        [
+          {
+            "node": "Due orders",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Failed orders",
             "type": "main",
             "index": 0
           }
