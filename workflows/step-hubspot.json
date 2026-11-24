@@ -35,12 +35,6 @@
               "name": "step",
               "value": "hubspot_deal",
               "type": "string"
-            },
-            {
-              "id": "5031b78b-d568-4981-9ecf-282b5e0ad9c4",
-              "name": "bad_duplicate",
-              "value": false,
-              "type": "boolean"
             }
           ]
         },
