@@ -42,6 +42,11 @@ flowchart TD
 | Error alert | failed execution of any workflow above | Report the workflow, node, error and execution link to Telegram |
 | HubSpot setup | manual, once per account | Create the custom deal and contact properties |
 
+The orchestrator, `Order processing`, on the n8n canvas: the main line on top, the duplicate
+decision and the HubSpot step below it.
+
+![Order processing workflow](assets/order-processing.png)
+
 ## Design decisions
 
 **State is a set of facts, not a status column.** An order has `blocked`, `duplicate`,
@@ -72,6 +77,8 @@ hold back the others; the order is completed only when no step
 failed, otherwise the run ends with an error that names the failed steps, and the retry
 repeats only those. Adding a provider means one new workflow and one node in the chain.
 
+![Step: Meta event workflow](assets/step-meta-event.png)
+
 **HubSpot is the only source of truth for duplicates.** A previous deal younger than the
 site's threshold (30 days) makes a bad duplicate that is never processed; an older one makes
 a good duplicate whose deal goes to a separate stage. Orders of one customer are processed
@@ -100,6 +107,7 @@ compose.test.yaml          disposable local test stand with stubbed providers
 db/schema.sql              leadgen schema, idempotent, applied on every deploy
 db/seed.sql                demo site, products and providers
 workflows/                 workflow exports, one JSON file each
+assets/                    screenshots for this README
 credentials.example.json   credential ids the workflows refer to, without secrets
 scripts/deploy.sh          upload compose.yaml, recreate containers, apply the schema
 scripts/export.sh          n8n -> workflows/ (through the n8n API)

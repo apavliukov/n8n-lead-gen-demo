@@ -276,8 +276,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.8,
       "position": [
-        2816,
-        -640
+        2000,
+        -320
       ],
       "id": "883d3df6-9541-4a1b-aa6c-70dc53e656f6",
       "name": "Complete order",
@@ -325,8 +325,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        1776,
-        -480
+        960,
+        -160
       ],
       "id": "3d3a12e4-759c-49b2-a567-5599b533c0b0",
       "name": "Order email",
@@ -369,8 +369,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        2048,
-        -480
+        1232,
+        -160
       ],
       "id": "67e9e6a9-d83a-48c4-8202-21535126e7d6",
       "name": "Meta event",
@@ -383,8 +383,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2304,
-        -480
+        1488,
+        -160
       ],
       "id": "9bc0d763-ef42-42b4-98f0-b1799d02a0e8",
       "name": "Failed steps"
@@ -417,8 +417,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.4,
       "position": [
-        2544,
-        -480
+        1728,
+        -160
       ],
       "id": "c075e4f4-6503-43bf-a7b5-5a1467aa53e7",
       "name": "All steps done?"
@@ -430,8 +430,8 @@
       "type": "n8n-nodes-base.stopAndError",
       "typeVersion": 1,
       "position": [
-        2816,
-        -320
+        2000,
+        0
       ],
       "id": "30234497-7b33-478f-8fe6-bed6efb6dd42",
       "name": "Steps failed"
@@ -504,8 +504,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        928,
-        -128
+        224,
+        176
       ],
       "id": "2d3565d6-2cf5-41f5-a026-e9f7ab01a2ad",
       "name": "Check duplicate"
@@ -538,8 +538,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.4,
       "position": [
-        1152,
-        -128
+        448,
+        176
       ],
       "id": "6e3868a8-c211-4966-a936-c4bee95b91e7",
       "name": "Bad duplicate?"
@@ -740,8 +740,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.8,
       "position": [
-        1424,
-        -144
+        720,
+        160
       ],
       "id": "7999ed9c-5e9b-48b0-aa14-6e03e7ef79ea",
       "name": "Mark bad duplicate",
@@ -834,8 +834,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        1424,
-        64
+        720,
+        368
       ],
       "id": "ac74ae4d-2d12-4833-b06b-9e7aafac8f78",
       "name": "HubSpot"
