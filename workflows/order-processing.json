@@ -24,7 +24,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- Claim the order for this run. No row back means it is terminal or another run holds it.\n-- The retry is scheduled right here, before any work: a failed or crashed run needs no cleanup,\n-- the order simply comes due again. After the last retry next_attempt_at becomes NULL.\nUPDATE leadgen.orders o\nSET locked_at = now(),\n    attempts = o.attempts + 1,\n    next_attempt_at = now() + (ARRAY['15 minutes', '1 hour', '3 hours', '12 hours', '24 hours']::interval[])[o.attempts + 1]\nFROM leadgen.products p, leadgen.sites s\nWHERE o.id = $1\n  AND p.id = o.product_id\n  AND s.id = o.site_id\n  AND NOT o.blocked\n  AND o.duplicate <> 2                                                     -- 2 = bad duplicate\n  AND o.completed_at IS NULL\n  AND (o.locked_at IS NULL OR o.locked_at < now() - interval '10 minutes') -- a stale claim is a crashed run\nRETURNING o.id, o.email, o.phone, o.payload, o.meta, o.attempts, o.created_at,\n          p.name AS product_name, p.price,\n          p.hubspot_pipeline, p.hubspot_stage, p.hubspot_duplicate_stage,\n          s.duplicate_days,\n          -- Providers connected to the site, keyed by type: {\"hubspot\": {\"id\": 1, \"settings\": {}}}\n          (SELECT coalesce(jsonb_object_agg(pr.type, jsonb_build_object('id', pr.id, 'settings', sp.settings)), '{}')\n           FROM leadgen.site_providers sp\n           JOIN leadgen.providers pr ON pr.id = sp.provider_id\n           WHERE sp.site_id = o.site_id AND sp.active AND pr.active) AS providers,\n          -- Steps that already succeeded for this order: [\"hubspot_contact\", \"hubspot_deal\"]\n          (SELECT coalesce(jsonb_agg(r.type), '[]')\n           FROM leadgen.provider_records r\n           WHERE r.order_id = o.id) AS done",
+        "query": "-- Claim the order for this run. No row back means it is terminal or another run holds it.\n-- The retry is scheduled right here, before any work: a failed or crashed run needs no cleanup,\n-- the order simply comes due again. After the last retry next_attempt_at becomes NULL.\nUPDATE leadgen.orders o\nSET locked_at = now(),\n    attempts = o.attempts + 1,\n    next_attempt_at = now() + (ARRAY['15 minutes', '1 hour', '3 hours', '12 hours', '24 hours']::interval[])[o.attempts + 1]\nFROM leadgen.products p, leadgen.sites s\nWHERE o.id = $1\n  AND p.id = o.product_id\n  AND s.id = o.site_id\n  AND NOT o.blocked\n  AND o.duplicate <> 2                                                     -- 2 = bad duplicate\n  AND o.completed_at IS NULL\n  AND (o.locked_at IS NULL OR o.locked_at < now() - interval '10 minutes') -- a stale claim is a crashed run\nRETURNING o.id, o.email, o.phone, o.payload, o.meta, o.attempts, o.created_at,\n          p.name AS product_name, p.price,\n          p.hubspot_pipeline, p.hubspot_stage, p.hubspot_duplicate_stage,\n          s.duplicate_days,\n          s.name AS site_name, s.email_from, s.email_from_name,\n          (SELECT code FROM leadgen.sources WHERE id = o.source_id) AS source,\n          -- Providers connected to the site, keyed by type: {\"hubspot\": {\"id\": 1, \"settings\": {}}}\n          (SELECT coalesce(jsonb_object_agg(pr.type, jsonb_build_object('id', pr.id, 'settings', sp.settings)), '{}')\n           FROM leadgen.site_providers sp\n           JOIN leadgen.providers pr ON pr.id = sp.provider_id\n           WHERE sp.site_id = o.site_id AND sp.active AND pr.active) AS providers,\n          -- Steps that already succeeded for this order: [\"hubspot_contact\", \"hubspot_deal\"]\n          (SELECT coalesce(jsonb_agg(r.type), '[]')\n           FROM leadgen.provider_records r\n           WHERE r.order_id = o.id) AS done",
         "options": {
           "queryReplacement": "={{ [ $json.order_id ] }}"
         }
@@ -694,8 +694,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.8,
       "position": [
-        2880,
-        288
+        5088,
+        1248
       ],
       "id": "883d3df6-9541-4a1b-aa6c-70dc53e656f6",
       "name": "Complete order",
@@ -742,6 +742,199 @@
         "hubspotAppToken": {
           "id": "hyYoN0gJrnrmVzhy",
           "name": "HubSpot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Claim order').first().json.email_from_name }} <{{ $('Claim order').first().json.email_from }}",
+        "toEmail": "={{ $('Claim order').first().json.email }}",
+        "subject": "=We received your order {{ $('Claim order').first().json.id }}",
+        "emailFormat": "both",
+        "text": "=Hello,\n\nwe received your order {{ $('Claim order').first().json.id }} at {{ $('Claim order').first().json.site_name }}.\n\nProduct: {{ $('Claim order').first().json.product_name }}\nPrice: {{ Number($('Claim order').first().json.price).toFixed(2) }} EUR\n\nWe will contact you shortly.",
+        "html": "=<p>Hello,</p>\n<p>we received your order <b>{{ $('Claim order').first().json.id }}</b> at {{ $('Claim order').first().json.site_name }}.</p>\n<p>Product: {{ $('Claim order').first().json.product_name }}<br>\nPrice: {{ Number($('Claim order').first().json.price).toFixed(2) }} EUR</p>\n<p>We will contact you shortly.</p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3072,
+        272
+      ],
+      "id": "dde1b439-d8f5-4ccb-b542-f73f763ba023",
+      "name": "Order received email",
+      "webhookId": "4cd63d6a-4d49-496e-a697-bbfa3d7b50f0",
+      "retryOnFail": true,
+      "credentials": {
+        "smtp": {
+          "id": "7S2DTYC5OznHPryB",
+          "name": "Mailpit"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "aa155224-69e4-4383-aaa0-4fee1f610e19",
+              "leftValue": "={{ !$('Claim order').first().json.done.includes('email_order_received') && !!$('Claim order').first().json.providers.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        2832,
+        288
+      ],
+      "id": "6d7fcf29-b4a9-4f8a-ba54-07be0b458db5",
+      "name": "Send order email?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO leadgen.provider_records (order_id, provider_id, type, external_id)\nVALUES ($1, $2, 'email_order_received', $3)\nON CONFLICT (order_id, type) DO NOTHING",
+        "options": {
+          "queryReplacement": "={{ [ $('Claim order').first().json.id, $('Claim order').first().json.providers.email.id, $json.messageId ?? null ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        3328,
+        272
+      ],
+      "id": "fc591b31-e049-4d5b-8cf2-53fd853c55c3",
+      "name": "Save email record",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "c25c7204-2474-486f-8168-3cbacf66f9c0",
+              "leftValue": "={{ !$('Claim order').first().json.done.includes('meta_purchase') && $('Claim order').first().json.source === 'facebook' && !!$('Claim order').first().json.providers.meta?.settings.pixel_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        3696,
+        512
+      ],
+      "id": "e27d7583-d0f4-465d-b6a4-47a4257653e1",
+      "name": "Send Meta event?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Purchase event for the Meta Conversions API. Personal data is normalized the way Meta\n-- prescribes and then hashed; IP, user agent and the click cookies are sent as they are.\nSELECT jsonb_strip_nulls(jsonb_build_object(\n    'event_name', 'Purchase',\n    'event_time', extract(epoch FROM o.created_at)::bigint,\n    'event_id', o.id::text,                -- lets Meta deduplicate against the browser pixel\n    'action_source', 'website',\n    'event_source_url', nullif(o.payload->>'original_url', ''),\n    'user_data', jsonb_build_object(\n        'em', leadgen.meta_hash(o.email),\n        'ph', leadgen.meta_hash(regexp_replace(o.phone, '\\D', '', 'g')),              -- digits with country code\n        'fn', leadgen.meta_hash(lower(trim(o.payload->>'first_name'))),\n        'ln', leadgen.meta_hash(lower(trim(o.payload->>'last_name'))),\n        'db', leadgen.meta_hash(replace(o.payload->>'birth_date', '-', '')),          -- YYYYMMDD\n        'ct', leadgen.meta_hash(lower(regexp_replace(o.payload->>'city', '[\\s[:punct:]]', '', 'g'))),\n        'zp', leadgen.meta_hash(lower(regexp_replace(o.payload->>'postal_code', '\\s', '', 'g'))),\n        'client_ip_address', o.meta->>'ip',\n        'client_user_agent', o.meta->>'user_agent',\n        'fbc', nullif(o.payload->>'fbc', ''),\n        'fbp', nullif(o.payload->>'fbp', '')\n    ),\n    'custom_data', jsonb_build_object(\n        'currency', 'EUR',\n        'value', p.price,\n        'order_id', o.id::text\n    )\n)) AS event\nFROM leadgen.orders o\nJOIN leadgen.products p ON p.id = o.product_id\nWHERE o.id = $1",
+        "options": {
+          "queryReplacement": "={{ [ $('Claim order').first().json.id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        3936,
+        496
+      ],
+      "id": "a4b400d2-65bd-4f8b-9876-acc356531da1",
+      "name": "Meta event",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v24.0/{{ $('Claim order').first().json.providers.meta.settings.pixel_id }}/events",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { data: [ $json.event ], test_event_code: $('Claim order').first().json.providers.meta.settings.test_event_code } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        4176,
+        496
+      ],
+      "id": "528308e8-1b8d-4a88-a2a5-2cfff2ba323d",
+      "name": "Send Meta event",
+      "retryOnFail": true,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "x4wRnjjwCn1CNrkL",
+          "name": "Meta Conversions API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO leadgen.provider_records (order_id, provider_id, type, external_id, response)\nVALUES ($1, $2, 'meta_purchase', $3, $4::jsonb)\nON CONFLICT (order_id, type) DO NOTHING",
+        "options": {
+          "queryReplacement": "={{ [ $('Claim order').first().json.id, $('Claim order').first().json.providers.meta.id, $json.fbtrace_id ?? null, JSON.stringify($json) ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        4416,
+        496
+      ],
+      "id": "45255bb3-67d8-48f4-86e6-f529eedd4468",
+      "name": "Save Meta record",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
         }
       }
     }
@@ -813,7 +1006,7 @@
       "main": [
         [
           {
-            "node": "Complete order",
+            "node": "Send order email?",
             "type": "main",
             "index": 0
           }
@@ -860,7 +1053,7 @@
       "main": [
         [
           {
-            "node": "Complete order",
+            "node": "Send order email?",
             "type": "main",
             "index": 0
           }
@@ -883,6 +1076,102 @@
         [
           {
             "node": "Save HubSpot result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send order email?": {
+      "main": [
+        [
+          {
+            "node": "Order received email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Meta event?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order received email": {
+      "main": [
+        [
+          {
+            "node": "Save email record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete order": {
+      "main": [
+        []
+      ]
+    },
+    "Save email record": {
+      "main": [
+        [
+          {
+            "node": "Send Meta event?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Meta event?": {
+      "main": [
+        [
+          {
+            "node": "Meta event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Complete order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta event": {
+      "main": [
+        [
+          {
+            "node": "Send Meta event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Meta event": {
+      "main": [
+        [
+          {
+            "node": "Save Meta record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Meta record": {
+      "main": [
+        [
+          {
+            "node": "Complete order",
             "type": "main",
             "index": 0
           }

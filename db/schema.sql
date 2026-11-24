@@ -104,3 +104,9 @@ CREATE TABLE IF NOT EXISTS provider_records (
     created_at  timestamptz NOT NULL DEFAULT now(),
     UNIQUE (order_id, type)
 );
+
+-- SHA-256 hex digest of an already normalized value, as the Meta Conversions API expects.
+-- NULL for a missing value. Lives in the database because the n8n Code node has no crypto module.
+CREATE OR REPLACE FUNCTION meta_hash(value text) RETURNS text
+LANGUAGE sql IMMUTABLE
+RETURN encode(sha256(convert_to(nullif(value, ''), 'UTF8')), 'hex');

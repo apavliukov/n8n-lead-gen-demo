@@ -115,7 +115,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        720,
+        688,
         -16
       ],
       "id": "4c008a57-2f1d-4a9f-aa58-e26b208dd4f3",
@@ -127,7 +127,7 @@
       "type": "n8n-nodes-base.limit",
       "typeVersion": 1,
       "position": [
-        944,
+        912,
         -16
       ],
       "id": "15b3d3aa-42e5-4bc9-950b-579c12c8abc9",
@@ -197,7 +197,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.4,
       "position": [
-        480,
+        464,
         256
       ],
       "id": "ae7f459c-ba30-4a66-bc34-57e1c7880041",
@@ -205,15 +205,14 @@
     },
     {
       "parameters": {
-        "operation": "sendRichMessage",
         "chatId": "54130950",
-        "richMessageText": "=Order {{ $json.order_id }} failed after {{ $json.attempts }} attempts.<br>\nSite: {{ $json.site_name }}<br>\nCustomer: {{ $json.email }}",
+        "text": "=Order {{ $json.order_id }} failed after {{ $json.attempts }} attempts. \nSite: {{ $json.site_name }} \nCustomer: {{ $json.email }}",
         "additionalFields": {}
       },
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        720,
+        688,
         240
       ],
       "id": "0946d8c7-269a-426f-9a1f-75996660c0c8",
