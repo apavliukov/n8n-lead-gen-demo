@@ -34,7 +34,8 @@ flowchart TD
 |---|---|---|
 | Order intake | `POST /webhook/orders` | Validate, save idempotently, pre-check for duplicates, answer the landing page, start processing or send the verification email |
 | Email verification | `GET /webhook/verify-email` | Mark the address verified, release its waiting orders, redirect to the site's page |
-| Order processing | called by the other three | Claim the order, then run each step once: duplicate check, HubSpot, email, Meta |
+| Order processing | called by the other three | Claim the order, check for duplicates, create the HubSpot contact and deal, then call the steps and complete the order |
+| Step: Order email, Step: Meta event | called by processing | One provider action each: decide whether it applies, perform it, record it |
 | Duplicate check | called by intake and processing | Find the customer in HubSpot by email or phone and classify the latest deal |
 | Scheduler | every 5 minutes, or `POST /webhook/scheduler/run` with a key | Process due orders in batches, alert about orders that ran out of attempts |
 | Error alert | failed execution of any workflow above | Report the workflow, node, error and execution link to Telegram |
@@ -60,6 +61,13 @@ Telegram once.
 **Two kinds of alerts.** Every failed execution is reported at once by a shared error
 workflow, with the node and the error text. An order that ran out of attempts is reported
 separately, once, as the case that needs a person.
+
+**Provider actions are isolated steps.** Each one is a sub-workflow with the same contract:
+it receives the claimed order, decides on its own whether it applies, performs the action
+and records it. The orchestrator calls the steps in a row with errors tolerated, so a
+failing provider does not hold back the others; the order is completed only when no step
+failed, otherwise the run ends with an error that names the failed steps, and the retry
+repeats only those. Adding a provider means one new workflow and one node in the chain.
 
 **HubSpot is the only source of truth for duplicates.** A previous deal younger than the
 site's threshold (30 days) makes a bad duplicate that is never processed; an older one makes

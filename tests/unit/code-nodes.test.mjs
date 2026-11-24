@@ -144,3 +144,25 @@ test('hubspot data: sends a good duplicate to the duplicate stage', () => {
   assert.equal(deal.description, 'Previous deal: 77');
   assert.equal(deal.id_valid_until, undefined); // product without id document fields
 });
+
+const failedSteps = (outputs) => run('order-processing', 'Failed steps', outputs).failed;
+
+test('failed steps: empty when every step returned its result', () => {
+  assert.deepEqual(failedSteps({ 'Order email': { step: 'email_order_received' }, 'Meta event': { step: 'meta_purchase' } }), []);
+});
+
+test('failed steps: names each failed step with its error', () => {
+  assert.deepEqual(
+    failedSteps({ 'Order email': { step: 'email_order_received' }, 'Meta event': { error: 'Bad request' } }),
+    ['Meta event: Bad request'],
+  );
+});
+
+test('failed steps: lists every step the orchestrator calls', () => {
+  const workflow = JSON.parse(readFileSync(new URL('../../workflows/order-processing.json', import.meta.url)));
+  const called = workflow.nodes
+    .filter((n) => n.type === 'n8n-nodes-base.executeWorkflow' && n.onError === 'continueRegularOutput')
+    .map((n) => n.name);
+  const listed = workflow.nodes.find((n) => n.name === 'Failed steps').parameters.jsCode.match(/steps = (\[.*?\])/)[1];
+  assert.deepEqual(JSON.parse(listed.replaceAll("'", '"')).sort(), called.sort());
+});

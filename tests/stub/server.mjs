@@ -1,12 +1,14 @@
 // In-memory stand-in for the external providers of the test stand: HubSpot CRM, the Meta
 // Conversions API and the Telegram Bot API. Implements only the calls the workflows make.
-// Control endpoints: GET /__requests (everything received so far), POST /__reset.
+// Control endpoints: GET /__requests (everything received so far), POST /__reset,
+// POST /__heal {event_id} (stop failing the Meta events of that order).
 import { createServer } from 'node:http';
 
 let contacts = [];
 let deals = [];
 let requests = [];
 let nextId = 1000;
+const healed = new Set();
 
 const matches = (object, filter) => {
   if (filter.propertyName === 'associations.contact') return filter.values.includes(object.contactId);
@@ -43,6 +45,10 @@ const handle = (method, path, body) => {
     requests = [];
     return [200, {}];
   }
+  if (method === 'POST' && path === '/__heal') {
+    healed.add(body.event_id);
+    return [200, {}];
+  }
   requests.push({ method, path, body });
 
   if (path === '/crm/v3/objects/contacts/search') return search(contacts, body);
@@ -58,7 +64,15 @@ const handle = (method, path, body) => {
     return create(contacts, body);
   }
   if (path === '/crm/v3/objects/deals') return create(deals, body);
-  if (/^\/v[\d.]+\/[^/]+\/events$/.test(path)) return [200, { events_received: 1 }];
+  if (/^\/v[\d.]+\/[^/]+\/events$/.test(path)) {
+    // Failure on demand: events of an order whose landing URL contains "meta-fail" are rejected
+    // until the test heals that order. The nodes retry on their own, so failing once is not enough.
+    const [event] = body.data;
+    if (event.event_source_url?.includes('meta-fail') && !healed.has(event.event_id)) {
+      return [400, { error: { message: 'Invalid parameter', type: 'OAuthException' } }];
+    }
+    return [200, { events_received: 1 }];
+  }
   if (/^\/bot[^/]+\/sendMessage$/.test(path)) {
     return [200, { ok: true, result: { message_id: nextId++, chat: { id: body.chat_id }, text: body.text } }];
   }

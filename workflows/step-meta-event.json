@@ -1,0 +1,224 @@
+{
+  "id": "vhwWKhLwh6ee6i6U",
+  "name": "Step: Meta event",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "order",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ff810627-a511-4642-98d1-fbb216a3273f",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "c25c7204-2474-486f-8168-3cbacf66f9c0",
+              "leftValue": "={{ !$('Start').first().json.order.done.includes('meta_purchase') && $('Start').first().json.order.source === 'facebook' && !!$('Start').first().json.order.providers.meta?.settings.pixel_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        240,
+        0
+      ],
+      "id": "f444fdd6-fa65-417f-9807-206e6d68fdac",
+      "name": "Send Meta event?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Purchase event for the Meta Conversions API. Personal data is normalized the way Meta\n-- prescribes and then hashed; IP, user agent and the click cookies are sent as they are.\nSELECT jsonb_strip_nulls(jsonb_build_object(\n    'event_name', 'Purchase',\n    'event_time', extract(epoch FROM o.created_at)::bigint,\n    'event_id', o.id::text,                -- lets Meta deduplicate against the browser pixel\n    'action_source', 'website',\n    'event_source_url', nullif(o.payload->>'original_url', ''),\n    'user_data', jsonb_build_object(\n        'em', leadgen.meta_hash(o.email),\n        'ph', leadgen.meta_hash(regexp_replace(o.phone, '\\D', '', 'g')),              -- digits with country code\n        'fn', leadgen.meta_hash(lower(trim(o.payload->>'first_name'))),\n        'ln', leadgen.meta_hash(lower(trim(o.payload->>'last_name'))),\n        'db', leadgen.meta_hash(replace(o.payload->>'birth_date', '-', '')),          -- YYYYMMDD\n        'ct', leadgen.meta_hash(lower(regexp_replace(o.payload->>'city', '[\\s[:punct:]]', '', 'g'))),\n        'zp', leadgen.meta_hash(lower(regexp_replace(o.payload->>'postal_code', '\\s', '', 'g'))),\n        'client_ip_address', o.meta->>'ip',\n        'client_user_agent', o.meta->>'user_agent',\n        'fbc', nullif(o.payload->>'fbc', ''),\n        'fbp', nullif(o.payload->>'fbp', '')\n    ),\n    'custom_data', jsonb_build_object(\n        'currency', 'EUR',\n        'value', p.price,\n        'order_id', o.id::text\n    )\n)) AS event\nFROM leadgen.orders o\nJOIN leadgen.products p ON p.id = o.product_id\nWHERE o.id = $1",
+        "options": {
+          "queryReplacement": "={{ [ $('Start').first().json.order.id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        480,
+        -16
+      ],
+      "id": "e8bb28c1-1f41-4c9c-b64c-2a1d0c0247b6",
+      "name": "Meta event",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v24.0/{{ $('Start').first().json.order.providers.meta.settings.pixel_id }}/events",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { data: [ $json.event ], test_event_code: $('Start').first().json.order.providers.meta.settings.test_event_code } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        -16
+      ],
+      "id": "6b9d23b5-3866-444d-b520-ad7d6750658b",
+      "name": "Send Meta event",
+      "retryOnFail": true,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "x4wRnjjwCn1CNrkL",
+          "name": "Meta Conversions API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO leadgen.provider_records (order_id, provider_id, type, external_id, response)\nVALUES ($1, $2, 'meta_purchase', $3, $4::jsonb)\nON CONFLICT (order_id, type) DO NOTHING",
+        "options": {
+          "queryReplacement": "={{ [ $('Start').first().json.order.id, $('Start').first().json.order.providers.meta.id, $json.fbtrace_id ?? null, JSON.stringify($json) ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        960,
+        -16
+      ],
+      "id": "aac818e2-51dc-4bc4-bb89-57de3159a9d4",
+      "name": "Save Meta record",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "73f1795d-caf2-44d6-a7e6-bc1b41f2b9aa",
+              "name": "step",
+              "value": "meta_purchase",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1184,
+        208
+      ],
+      "id": "bf8cd7fc-6f70-4493-993a-c156757bee1c",
+      "name": "Done"
+    }
+  ],
+  "connections": {
+    "Send Meta event?": {
+      "main": [
+        [
+          {
+            "node": "Meta event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta event": {
+      "main": [
+        [
+          {
+            "node": "Send Meta event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Meta event": {
+      "main": [
+        [
+          {
+            "node": "Save Meta record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Send Meta event?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Meta record": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

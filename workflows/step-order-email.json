@@ -1,0 +1,196 @@
+{
+  "id": "tK3jRNpWOZs3BUKa",
+  "name": "Step: Order email",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "order",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ad8ccd74-629a-40e2-a95b-de6b7cce6251",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "73f1795d-caf2-44d6-a7e6-bc1b41f2b9aa",
+              "name": "step",
+              "value": "email_order_received",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        976,
+        208
+      ],
+      "id": "a1e0fcfb-e3ba-4be3-aa4c-b4b91d2b57b5",
+      "name": "Done"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Start').first().json.order.email_from_name }} <{{ $('Start').first().json.order.email_from }}>",
+        "toEmail": "={{ $('Start').first().json.order.email }}",
+        "subject": "=We received your order {{ $('Start').first().json.order.id }}",
+        "emailFormat": "both",
+        "text": "=Hello,\n\nwe received your order {{ $('Start').first().json.order.id }} at {{ $('Start').first().json.order.site_name }}.\n\nProduct: {{ $('Start').first().json.order.product_name }}\nPrice: {{ Number($('Start').first().json.order.price).toFixed(2) }} EUR\n\nWe will contact you shortly.",
+        "html": "=<p>Hello,</p>\n<p>we received your order <b>{{ $('Start').first().json.order.id }}</b> at {{ $('Start').first().json.order.site_name }}.</p>\n<p>Product: {{ $('Start').first().json.order.product_name }}<br>\nPrice: {{ Number($('Start').first().json.order.price).toFixed(2) }} EUR</p>\n<p>We will contact you shortly.</p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        464,
+        -16
+      ],
+      "id": "51413220-5600-41f5-bc18-e5db9782280b",
+      "name": "Order received email",
+      "webhookId": "4cd63d6a-4d49-496e-a697-bbfa3d7b50f0",
+      "retryOnFail": false,
+      "credentials": {
+        "smtp": {
+          "id": "7S2DTYC5OznHPryB",
+          "name": "Mailpit"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "aa155224-69e4-4383-aaa0-4fee1f610e19",
+              "leftValue": "={{ !$('Start').first().json.order.done.includes('email_order_received') && !!$('Start').first().json.order.providers.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "43d6213b-f08a-40c8-8cad-f103c703a8a2",
+      "name": "Send order email?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO leadgen.provider_records (order_id, provider_id, type, external_id)\nVALUES ($1, $2, 'email_order_received', $3)\nON CONFLICT (order_id, type) DO NOTHING",
+        "options": {
+          "queryReplacement": "={{ [ $('Start').first().json.order.id, $('Start').first().json.order.providers.email.id, $json.messageId ?? null ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        720,
+        -16
+      ],
+      "id": "7b12c857-3607-4c97-a19a-04f903727288",
+      "name": "Save email record",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Send order email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order received email": {
+      "main": [
+        [
+          {
+            "node": "Save email record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send order email?": {
+      "main": [
+        [
+          {
+            "node": "Order received email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save email record": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "Lfzblgzr3SwBwpsE",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

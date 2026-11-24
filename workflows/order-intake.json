@@ -677,7 +677,7 @@
       "id": "3cb380cb-146f-43ce-a2ce-7079b43b71e0",
       "name": "Send an Email",
       "webhookId": "958f0931-274e-4512-b0eb-b487af9b5e02",
-      "retryOnFail": true,
+      "retryOnFail": false,
       "credentials": {
         "smtp": {
           "id": "7S2DTYC5OznHPryB",

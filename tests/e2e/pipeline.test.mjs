@@ -225,3 +225,26 @@ test('does not start an order while another one of the customer is in progress',
   await schedulerPass();
   assert.ok(order(second).completed_at, 'the scheduler picks the order up later');
 });
+
+test('keeps the other steps going when one provider fails and retries only the failed one', { skip }, async () => {
+  const payload = customer({ original_url: 'https://landing.example/order?fbclid=meta-fail' }); // the stub rejects this event until healed
+  verify(payload.email);
+  const { order_id: id } = await submit(payload);
+
+  const alert = await eventually(
+    async () => (await stubRequests(/sendMessage$/)).find((r) => r.body.text.includes('Steps failed: Meta event')),
+    'the error alert',
+  );
+  assert.match(alert.body.text, /Order processing/);
+  assert.deepEqual(steps(id), ['email_order_received', 'hubspot_contact', 'hubspot_deal']);
+  assert.equal(order(id).completed_at, null);
+
+  await post(`${STUB_URL}/__heal`, { event_id: String(id) });
+  run(`UPDATE leadgen.orders SET next_attempt_at = now(), ${STALE_LOCK} WHERE id = ${id}`);
+  await schedulerPass();
+  assert.ok(order(id).completed_at);
+  assert.ok(steps(id).includes('meta_purchase'));
+  const { messages } = await json(`${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:${payload.email}`)}`);
+  assert.equal(messages.length, 1, 'the email is not sent again');
+  assert.equal((await stubRequests(/\/objects\/deals$/)).filter((r) => r.body.properties.order_number === String(id)).length, 1);
+});
