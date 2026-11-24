@@ -189,7 +189,6 @@
     "executionOrder": "v1",
     "binaryMode": "separate",
     "timeSavedMode": "fixed",
-    "errorWorkflow": "Lfzblgzr3SwBwpsE",
     "callerPolicy": "workflowsFromSameOwner",
     "availableInMCP": false
   }

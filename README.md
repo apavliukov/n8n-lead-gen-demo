@@ -34,7 +34,8 @@ flowchart TD
 |---|---|---|
 | Order intake | `POST /webhook/orders` | Validate, save idempotently, pre-check for duplicates, answer the landing page, start processing or send the verification email |
 | Email verification | `GET /webhook/verify-email` | Mark the address verified, release its waiting orders, redirect to the site's page |
-| Order processing | called by the other three | Claim the order, check for duplicates, create the HubSpot contact and deal, then call the steps and complete the order |
+| Order processing | called by the other three | Orchestrator: claim the order, decide on duplicates, call the steps, complete the order |
+| Step: HubSpot | called by processing | Create the contact and the deal; mandatory, a failure stops the run |
 | Step: Order email, Step: Meta event | called by processing | One provider action each: decide whether it applies, perform it, record it |
 | Duplicate check | called by intake and processing | Find the customer in HubSpot by email or phone and classify the latest deal |
 | Scheduler | every 5 minutes, or `POST /webhook/scheduler/run` with a key | Process due orders in batches, alert about orders that ran out of attempts |
@@ -64,8 +65,10 @@ separately, once, as the case that needs a person.
 
 **Provider actions are isolated steps.** Each one is a sub-workflow with the same contract:
 it receives the claimed order, decides on its own whether it applies, performs the action
-and records it. The orchestrator calls the steps in a row with errors tolerated, so a
-failing provider does not hold back the others; the order is completed only when no step
+and records it. The duplicate decision is a business rule and stays in the orchestrator, which passes its
+result to the HubSpot step. That step is mandatory: without a deal nothing else is sent. The
+remaining steps are called in a row with errors tolerated, so a failing provider does not
+hold back the others; the order is completed only when no step
 failed, otherwise the run ends with an error that names the failed steps, and the retry
 repeats only those. Adding a provider means one new workflow and one node in the chain.
 

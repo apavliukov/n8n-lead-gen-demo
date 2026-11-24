@@ -108,10 +108,12 @@ test('validate: reports every broken field at once', () => {
   assert.deepEqual(Object.keys(errors).sort(), ['birth_date', 'email', 'iban', 'terms']);
 });
 
-const hubspotData = (order, check = {}) => run('order-processing', 'HubSpot data', {
-  'Claim order': { id: '1000001', email: 'max@example.com', phone: '+49151000', price: '9.99', product_name: 'Mobile 10 GB',
-    hubspot_pipeline: 'default', hubspot_stage: 'new', hubspot_duplicate_stage: 'dup', meta: { ip: '203.0.113.7' }, ...order },
-  'Check duplicate': { contact_id: null, is_good_duplicate: false, last_deal_id: null, ...check },
+const hubspotData = (order, check = {}) => run('step-hubspot', 'HubSpot data', {
+  Start: {
+    order: { id: '1000001', email: 'max@example.com', phone: '+49151000', price: '9.99', product_name: 'Mobile 10 GB',
+      hubspot_pipeline: 'default', hubspot_stage: 'new', hubspot_duplicate_stage: 'dup', meta: { ip: '203.0.113.7' }, ...order },
+    check: { contact_id: null, is_good_duplicate: false, last_deal_id: null, ...check },
+  },
 });
 const form = { first_name: 'Max', last_name: 'Mustermann', street: 'Musterstr.', house_number: '1', postal_code: '10115',
   city: 'Berlin', birth_date: '1990-01-01', iban: 'DE00', original_url: 'https://landing.example/order?x=1' };

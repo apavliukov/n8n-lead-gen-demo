@@ -47,322 +47,6 @@
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "w7nsUDamiw3MRqbI",
-          "mode": "list",
-          "cachedResultUrl": "/workflow/w7nsUDamiw3MRqbI",
-          "cachedResultName": "Duplicate check"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "email": "={{ $json.email }}",
-            "phone": "={{ $json.phone }}",
-            "duplicate_days": "={{ $json.duplicate_days }}",
-            "order_id": "={{ $json.id }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "email",
-              "displayName": "email",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "phone",
-              "displayName": "phone",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "duplicate_days",
-              "displayName": "duplicate_days",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "number",
-              "removed": false
-            },
-            {
-              "id": "order_id",
-              "displayName": "order_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.4,
-      "position": [
-        896,
-        -128
-      ],
-      "id": "9a08f47a-d558-40b5-ab94-636f5f606168",
-      "name": "Check duplicate"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 4
-          },
-          "conditions": [
-            {
-              "id": "6c27e7f2-c4c6-4611-ad65-04ec7ba50b6d",
-              "leftValue": "={{ $json.is_bad_duplicate }}",
-              "rightValue": 2,
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.4,
-      "position": [
-        1120,
-        -128
-      ],
-      "id": "820a87f8-447e-4a86-aa28-8fc1dbe84a5d",
-      "name": "Bad duplicate?"
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "schema": {
-          "__rl": true,
-          "value": "leadgen",
-          "mode": "list",
-          "cachedResultName": "leadgen"
-        },
-        "table": {
-          "__rl": true,
-          "value": "orders",
-          "mode": "list",
-          "cachedResultName": "orders"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "locked_at": "={{ null }}",
-            "id": "={{ $('Claim order').item.json.id }}",
-            "next_attempt_at": "={{ null }}",
-            "duplicate": "={{ $json.duplicate }}"
-          },
-          "matchingColumns": [
-            "id"
-          ],
-          "schema": [
-            {
-              "id": "id",
-              "displayName": "id",
-              "required": false,
-              "defaultMatch": true,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "site_id",
-              "displayName": "site_id",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "product_id",
-              "displayName": "product_id",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "source_id",
-              "displayName": "source_id",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "idempotency_key",
-              "displayName": "idempotency_key",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "email",
-              "displayName": "email",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "phone",
-              "displayName": "phone",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "payload",
-              "displayName": "payload",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "object",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "meta",
-              "displayName": "meta",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "object",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "blocked",
-              "displayName": "blocked",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "boolean",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "duplicate",
-              "displayName": "duplicate",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "attempts",
-              "displayName": "attempts",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "next_attempt_at",
-              "displayName": "next_attempt_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "locked_at",
-              "displayName": "locked_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "completed_at",
-              "displayName": "completed_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "created_at",
-              "displayName": "created_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true,
-              "removed": true
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.8,
-      "position": [
-        1344,
-        -224
-      ],
-      "id": "d80c7fbb-a88f-4f1f-880b-403fb42ddbbd",
-      "name": "Mark bad duplicate",
-      "credentials": {
-        "postgres": {
-          "id": "LOPaUITik7f6aoEh",
-          "name": "Leadgen DB"
-        }
-      }
-    },
-    {
-      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
@@ -395,123 +79,6 @@
       ],
       "id": "5bf87541-7eb4-482d-9d2f-65938ab5a7b0",
       "name": "Claimed?"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 4
-          },
-          "conditions": [
-            {
-              "id": "1e4fc662-420b-470b-b6ed-b826f6947785",
-              "leftValue": "={{ $json.done.includes('hubspot_deal') }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.4,
-      "position": [
-        688,
-        304
-      ],
-      "id": "0097524d-f98f-4451-b98c-75b5ac856c99",
-      "name": "Deal created?"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 4
-          },
-          "conditions": [
-            {
-              "id": "a8d156a3-f15f-4076-8865-2b446836103e",
-              "leftValue": "={{ $json.contact_id }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.4,
-      "position": [
-        2112,
-        -32
-      ],
-      "id": "f681a458-ff8a-442f-8f15-035cfe080bc2",
-      "name": "Contact exists?"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.hubapi.com/crm/v3/objects/contacts",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "hubspotAppToken",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { properties: { ...$('HubSpot data').first().json.contact, email: $('Claim order').first().json.email } } }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        2336,
-        112
-      ],
-      "id": "e5c99388-89f8-49a5-9ed7-1612dd60adff",
-      "name": "Create contact",
-      "credentials": {
-        "hubspotAppToken": {
-          "id": "hyYoN0gJrnrmVzhy",
-          "name": "HubSpot"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH saved AS (\n    INSERT INTO leadgen.provider_records (order_id, provider_id, type, external_id, response)\n    VALUES ($1, $2, 'hubspot_contact', $3, NULL),\n           ($1, $2, 'hubspot_deal', $4, $5::jsonb)\n    ON CONFLICT (order_id, type) DO NOTHING\n)\nUPDATE leadgen.orders\nSET duplicate = $6\nWHERE id = $1",
-        "options": {
-          "queryReplacement": "={{ [ $('Claim order').first().json.id, $('Claim order').first().json.providers.hubspot.id, $json.associations?.contacts?.results?.[0]?.id ?? $('Check duplicate').first().json.contact_id ?? $('Create contact').first().json.id, $('Check duplicate').first().json.own_deal_id ?? $json.id, JSON.stringify($json), $('Check duplicate').first().json.duplicate ] }}"
-        }
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.8,
-      "position": [
-        2928,
-        -208
-      ],
-      "id": "c02d2034-e370-4cad-94ad-e51e703033e0",
-      "name": "Save HubSpot result",
-      "credentials": {
-        "postgres": {
-          "id": "LOPaUITik7f6aoEh",
-          "name": "Leadgen DB"
-        }
-      }
     },
     {
       "parameters": {
@@ -709,8 +276,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.8,
       "position": [
-        4368,
-        160
+        2816,
+        -640
       ],
       "id": "883d3df6-9541-4a1b-aa6c-70dc53e656f6",
       "name": "Complete order",
@@ -720,79 +287,6 @@
           "name": "Leadgen DB"
         }
       }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Maps the order to HubSpot contact and deal properties.\n// The contact holds identity only and is never updated; everything a customer can change\n// between orders (address, bank account, id document, contact details) is a snapshot on the deal.\nconst order = $('Claim order').first().json;\nconst check = $('Check duplicate').first().json;\nconst form = order.payload;\n\n// DD.MM.YYYY -> YYYY-MM-DD, the format HubSpot date properties accept.\nconst isoDate = (value) => (value ? value.split('.').reverse().join('-') : undefined);\n// Host of the landing page the form was submitted from. The URL class is not available here.\nconst domain = (url) => String(url ?? '').match(/^https?:\\/\\/([^\\/?#]+)/)?.[1];\n\nreturn [{\n  json: {\n    contact_id: check.contact_id,\n    contact: {\n      firstname: form.first_name,\n      lastname: form.last_name,\n      phone: order.phone,\n      date_of_birth: form.birth_date,\n      birth_place: form.birth_place,\n    },\n    deal: {\n      dealname: `${form.first_name} ${form.last_name}`,\n      amount: order.price,\n      pipeline: order.hubspot_pipeline,\n      dealstage: check.is_good_duplicate ? order.hubspot_duplicate_stage : order.hubspot_stage,\n      description: `Previous deal: ${check.last_deal_id ?? 'none'}`,\n      order_number: String(order.id),\n      product_name: order.product_name,\n      source_domain: domain(form.original_url),\n      client_ip: order.meta.ip,\n      order_email: order.email,\n      order_phone: order.phone,\n      address: `${form.street} ${form.house_number}`,\n      postal_code: form.postal_code,\n      city: form.city,\n      iban: form.iban,\n      id_number: form.id_number,\n      id_valid_until: isoDate(form.id_valid_until),\n    },\n  },\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1712,
-        -32
-      ],
-      "id": "8d957181-4656-4aaf-ae51-c9408df2ec10",
-      "name": "HubSpot data"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.hubapi.com/crm/v3/objects/deals",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "hubspotAppToken",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { properties: $('HubSpot data').first().json.deal, associations: [ { to: { id: $json.id ?? $json.contact_id }, types: [ { associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 3 } ] } ] } }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        2704,
-        -32
-      ],
-      "id": "df381fca-1dae-43d0-bb52-0b0e174bacdb",
-      "name": "Create deal",
-      "credentials": {
-        "hubspotAppToken": {
-          "id": "hyYoN0gJrnrmVzhy",
-          "name": "HubSpot"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 4
-          },
-          "conditions": [
-            {
-              "id": "3680b564-e8b9-4e9c-bc90-8f8915771270",
-              "leftValue": "={{ !!$('Check duplicate').first().json.own_deal_id }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.4,
-      "position": [
-        1344,
-        -16
-      ],
-      "id": "c989e8e3-8975-492a-a0a3-f1bc3f93b9a3",
-      "name": "Own deal found?"
     },
     {
       "parameters": {
@@ -831,8 +325,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        3328,
-        320
+        1776,
+        -480
       ],
       "id": "3d3a12e4-759c-49b2-a567-5599b533c0b0",
       "name": "Order email",
@@ -875,8 +369,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        3600,
-        320
+        2048,
+        -480
       ],
       "id": "67e9e6a9-d83a-48c4-8202-21535126e7d6",
       "name": "Meta event",
@@ -889,8 +383,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3856,
-        320
+        2304,
+        -480
       ],
       "id": "9bc0d763-ef42-42b4-98f0-b1799d02a0e8",
       "name": "Failed steps"
@@ -923,8 +417,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.4,
       "position": [
-        4096,
-        320
+        2544,
+        -480
       ],
       "id": "c075e4f4-6503-43bf-a7b5-5a1467aa53e7",
       "name": "All steps done?"
@@ -936,11 +430,415 @@
       "type": "n8n-nodes-base.stopAndError",
       "typeVersion": 1,
       "position": [
-        4368,
-        480
+        2816,
+        -320
       ],
       "id": "30234497-7b33-478f-8fe6-bed6efb6dd42",
       "name": "Steps failed"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "UJvUegYOePAThJH3",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/UJvUegYOePAThJH3",
+          "cachedResultName": "Step: HubSpot"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order": "={{ $('Claim order').first().json }}",
+            "check": "={{ $('Check duplicate').first().json }}"
+          },
+          "matchingColumns": [
+            "order"
+          ],
+          "schema": [
+            {
+              "id": "order",
+              "displayName": "order",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            },
+            {
+              "id": "check",
+              "displayName": "check",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        1424,
+        64
+      ],
+      "id": "ac74ae4d-2d12-4833-b06b-9e7aafac8f78",
+      "name": "Hubspot"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "w7nsUDamiw3MRqbI",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/w7nsUDamiw3MRqbI",
+          "cachedResultName": "Duplicate check"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $json.email }}",
+            "phone": "={{ $json.phone }}",
+            "duplicate_days": "={{ $json.duplicate_days }}",
+            "order_id": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "duplicate_days",
+              "displayName": "duplicate_days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            },
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        928,
+        -128
+      ],
+      "id": "2d3565d6-2cf5-41f5-a026-e9f7ab01a2ad",
+      "name": "Check duplicate"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "6c27e7f2-c4c6-4611-ad65-04ec7ba50b6d",
+              "leftValue": "={{ $json.is_bad_duplicate }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1152,
+        -128
+      ],
+      "id": "6e3868a8-c211-4966-a936-c4bee95b91e7",
+      "name": "Bad duplicate?"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "value": "leadgen",
+          "mode": "list",
+          "cachedResultName": "leadgen"
+        },
+        "table": {
+          "__rl": true,
+          "value": "orders",
+          "mode": "list",
+          "cachedResultName": "orders"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "locked_at": "={{ null }}",
+            "id": "={{ $('Claim order').first().json.id }}",
+            "next_attempt_at": "={{ null }}",
+            "duplicate": "={{ $json.duplicate }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "site_id",
+              "displayName": "site_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "product_id",
+              "displayName": "product_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "source_id",
+              "displayName": "source_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "idempotency_key",
+              "displayName": "idempotency_key",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "meta",
+              "displayName": "meta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "blocked",
+              "displayName": "blocked",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "duplicate",
+              "displayName": "duplicate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "attempts",
+              "displayName": "attempts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "next_attempt_at",
+              "displayName": "next_attempt_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "locked_at",
+              "displayName": "locked_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "completed_at",
+              "displayName": "completed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        1424,
+        -144
+      ],
+      "id": "7999ed9c-5e9b-48b0-aa14-6e03e7ef79ea",
+      "name": "Mark bad duplicate",
+      "credentials": {
+        "postgres": {
+          "id": "LOPaUITik7f6aoEh",
+          "name": "Leadgen DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "1e4fc662-420b-470b-b6ed-b826f6947785",
+              "leftValue": "={{ $json.done.includes('hubspot_deal') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        704,
+        -144
+      ],
+      "id": "ab642581-3401-48ff-8f92-0fe7cf5e48a1",
+      "name": "Deal created?"
     }
   ],
   "connections": {
@@ -966,35 +864,6 @@
         ]
       ]
     },
-    "Check duplicate": {
-      "main": [
-        [
-          {
-            "node": "Bad duplicate?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Bad duplicate?": {
-      "main": [
-        [
-          {
-            "node": "Mark bad duplicate",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Own deal found?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Claimed?": {
       "main": [
         [
@@ -1006,107 +875,9 @@
         ]
       ]
     },
-    "Deal created?": {
-      "main": [
-        [
-          {
-            "node": "Order email",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Check duplicate",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Contact exists?": {
-      "main": [
-        [
-          {
-            "node": "Create deal",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Create contact",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Create contact": {
-      "main": [
-        [
-          {
-            "node": "Create deal",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Save HubSpot result": {
-      "main": [
-        [
-          {
-            "node": "Order email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HubSpot data": {
-      "main": [
-        [
-          {
-            "node": "Contact exists?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Create deal": {
-      "main": [
-        [
-          {
-            "node": "Save HubSpot result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Complete order": {
       "main": [
         []
-      ]
-    },
-    "Own deal found?": {
-      "main": [
-        [
-          {
-            "node": "Save HubSpot result",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "HubSpot data",
-            "type": "main",
-            "index": 0
-          }
-        ]
       ]
     },
     "Order email": {
@@ -1154,6 +925,64 @@
         [
           {
             "node": "Steps failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hubspot": {
+      "main": [
+        [
+          {
+            "node": "Order email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check duplicate": {
+      "main": [
+        [
+          {
+            "node": "Bad duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bad duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Mark bad duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hubspot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deal created?": {
+      "main": [
+        [
+          {
+            "node": "Order email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check duplicate",
             "type": "main",
             "index": 0
           }

@@ -144,7 +144,7 @@ test('schedules a retry and alerts when a provider rejects the order', { skip },
   assert.equal(status, 'success', 'the landing page is not told about provider failures');
 
   const alert = await eventually(
-    async () => (await stubRequests(/sendMessage$/)).find((r) => r.body.text.includes('Create contact')),
+    async () => (await stubRequests(/sendMessage$/)).find((r) => /Node: HubSpot/i.test(r.body.text)),
     'the error alert',
   );
   assert.match(alert.body.text, /Order processing/);
