@@ -2,7 +2,8 @@
 
 An order processing pipeline for landing pages, built on self-hosted n8n and Postgres.
 A landing page posts an order form to a webhook; the pipeline validates it, verifies the
-customer's email address, detects duplicates in the CRM, creates the contact and the deal,
+customer's email address, detects duplicates in the CRM, flags junk orders with an AI
+classifier, creates the contact and the deal,
 notifies the customer, reports the conversion to Meta and retries anything that failed.
 
 It is a port of a production Laravel system to n8n, reduced to the parts that matter:
@@ -23,7 +24,9 @@ flowchart TD
     T[Scheduler, every 5 min] -->|due: 2 h timeout, retries, queue| P
     P --> D{Duplicate check}
     D -->|deal younger than 30 days| X[Marked bad duplicate, stop]
-    D --> H[HubSpot contact + deal]
+    D --> K[AI spam check: TypeSafe Jev classifier]
+    K -->|ok, or no verdict| H[HubSpot contact + deal]
+    K -->|spam: review stage| H
     H --> E[Order received email]
     E --> F[Meta Purchase event]
     F --> C[Completed]
@@ -38,7 +41,7 @@ flowchart TD
 | Step: HubSpot | called by processing | Create the contact and the deal; mandatory, a failure stops the run |
 | Step: Order email, Step: Meta event | called by processing | One provider action each: decide whether it applies, perform it, record it |
 | Duplicate check | called by intake and processing | Find the customer in HubSpot by email or phone and classify the latest deal |
-| Spam check | called by processing | Ask a classification model whether the form looks like a real order |
+| Spam check | called by processing | Ask an AI classification model (TypeSafe Jev) whether the form looks like a real order |
 | Scheduler | every 5 minutes, or `POST /webhook/scheduler/run` with a key | Process due orders in batches, alert about orders that ran out of attempts |
 | Error alert | failed execution of any workflow above | Report the workflow, node, error and execution link to Telegram |
 | HubSpot setup | manual, once per account | Create the custom deal and contact properties |
@@ -80,7 +83,7 @@ repeats only those. Adding a provider means one new workflow and one node in the
 
 ![Step: Meta event workflow](assets/step-meta-event.png)
 
-**A classifier flags junk orders, a person decides.** Before the deal is created, a
+**An AI classifier flags junk orders, a person decides.** Before the deal is created, a
 classification model (TypeSafe Jev) rates the form as `ok`, `suspicious` or `spam`. Jev
 picks one of the options it was given and returns calibrated probabilities; it cannot
 produce text, so there is nothing to parse and no room for a made-up answer. A `spam`
