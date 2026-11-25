@@ -46,8 +46,8 @@ flowchart TD
 | Error alert | failed execution of any workflow above | Report the workflow, node, error and execution link to Telegram |
 | HubSpot setup | manual, once per account | Create the custom deal and contact properties |
 
-The orchestrator, `Order processing`, on the n8n canvas: the main line on top, the duplicate
-decision and the HubSpot step below it.
+The orchestrator, `Order processing`, on the n8n canvas: the main line on top; the duplicate
+decision, the AI spam check and the HubSpot step below it.
 
 ![Order processing workflow](assets/order-processing.png)
 
