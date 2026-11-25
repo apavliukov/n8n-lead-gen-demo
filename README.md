@@ -132,7 +132,7 @@ scripts/stand.sh           start, test and remove the local test stand
 scripts/hubspot-lag.mjs    measure how fast HubSpot's search sees a new deal
 tests/unit/                Code nodes from the exports, run without n8n
 tests/e2e/                 requests against a running instance
-tests/stub/                stand-in for HubSpot, Meta and Telegram
+tests/stub/                stand-in for HubSpot, Meta, TypeSafe and Telegram
 test-payloads/             example order payloads
 ```
 
@@ -153,9 +153,9 @@ front of port 5678, and locally `jq`, `curl` and Node 24.
    `N8N_API_KEY` into a local `.env`.
 4. **Credentials and workflows.** Copy `credentials.example.json` to `credentials.json`,
    fill in the secrets and run `scripts/import.sh --credentials`. Publish the workflows in
-   the editor; imported workflows arrive unpublished. Publish `Duplicate check` first, then
-   `Order processing`, then the rest: n8n refuses to publish a workflow before the
-   sub-workflows it calls.
+   the editor; imported workflows arrive unpublished. Publish the sub-workflows first
+   (`Duplicate check`, `Spam check` and the three `Step:` workflows), then `Order processing`,
+   then the rest: n8n refuses to publish a workflow before the sub-workflows it calls.
 5. **HubSpot.** Run the `HubSpot setup` workflow once, create a "Duplicate" and a "Spam" deal stage and
    put the pipeline and stage ids into `leadgen.products`.
 6. **Meta.** Put the pixel id (and, for testing, a `test_event_code`) into
