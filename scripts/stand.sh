@@ -1,6 +1,6 @@
 #!/bin/sh
 # Local test stand (compose.test.yaml): a throwaway n8n with the workflows from workflows/,
-# where HubSpot, Meta and Telegram are replaced by tests/stub/server.mjs and mail goes to Mailpit.
+# where HubSpot, Meta, TypeSafe and Telegram are replaced by tests/stub/server.mjs and mail goes to Mailpit.
 # Usage: scripts/stand.sh up | test [node --test options] | down
 #   up    start the stand from scratch: schema, seed, credentials, workflows, publish
 #   test  run the e2e suite against the stand
@@ -33,7 +33,8 @@ up)
     mkdir "$tmp/workflows"
     for file in workflows/*.json; do
         sed -e 's#https://api.hubapi.com#http://stub:8080#g' \
-            -e 's#https://graph.facebook.com#http://stub:8080#g' "$file" > "$tmp/$file"
+            -e 's#https://graph.facebook.com#http://stub:8080#g' \
+            -e 's#https://api.typesafe.ai#http://stub:8080#g' "$file" > "$tmp/$file"
     done
     jq 'map(.data |= with_entries(select(.value == "REPLACE_ME").value = "test"))
         | map(select(.type == "telegramApi").data.baseUrl = "http://stub:8080")' \

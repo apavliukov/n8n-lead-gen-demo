@@ -108,11 +108,12 @@ test('validate: reports every broken field at once', () => {
   assert.deepEqual(Object.keys(errors).sort(), ['birth_date', 'email', 'iban', 'terms']);
 });
 
-const hubspotData = (order, check = {}) => run('step-hubspot', 'HubSpot data', {
+const hubspotData = (order, check = {}, spam) => run('step-hubspot', 'HubSpot data', {
   Start: {
     order: { id: '1000001', email: 'max@example.com', phone: '+49151000', price: '9.99', product_name: 'Mobile 10 GB',
-      hubspot_pipeline: 'default', hubspot_stage: 'new', hubspot_duplicate_stage: 'dup', meta: { ip: '203.0.113.7' }, ...order },
+      hubspot_pipeline: 'default', hubspot_stage: 'new', hubspot_duplicate_stage: 'dup', hubspot_spam_stage: 'review', meta: { ip: '203.0.113.7' }, ...order },
     check: { contact_id: null, is_good_duplicate: false, last_deal_id: null, ...check },
+    spam,
   },
 });
 const form = { first_name: 'Max', last_name: 'Mustermann', street: 'Musterstr.', house_number: '1', postal_code: '10115',
@@ -163,8 +164,31 @@ test('failed steps: names each failed step with its error', () => {
 test('failed steps: lists every step the orchestrator calls', () => {
   const workflow = JSON.parse(readFileSync(new URL('../../workflows/order-processing.json', import.meta.url)));
   const called = workflow.nodes
-    .filter((n) => n.type === 'n8n-nodes-base.executeWorkflow' && n.onError === 'continueRegularOutput')
+    // Independent steps only: the spam check also tolerates errors, but its failure must not fail the order.
+    .filter((n) => n.onError === 'continueRegularOutput' && n.parameters.workflowId?.cachedResultName?.startsWith('Step:'))
     .map((n) => n.name);
   const listed = workflow.nodes.find((n) => n.name === 'Failed steps').parameters.jsCode.match(/steps = (\[.*?\])/)[1];
   assert.deepEqual(JSON.parse(listed.replaceAll("'", '"')).sort(), called.sort());
+});
+
+// name -> [spam check result, order overrides, expected stage]
+const spamStages = {
+  'spam verdict goes to the review stage': [{ verdict: 'spam', confidence: 0.9 }, {}, 'review'],
+  'suspicious verdict stays in the normal stage': [{ verdict: 'suspicious', confidence: 0.6 }, {}, 'new'],
+  'ok verdict stays in the normal stage': [{ verdict: 'ok', confidence: 0.9 }, {}, 'new'],
+  'disabled check stays in the normal stage': [{ checked: false }, {}, 'new'],
+  'failed check stays in the normal stage': [{ error: 'Overloaded' }, {}, 'new'],
+  'spam verdict without a configured stage stays in the normal stage': [{ verdict: 'spam' }, { hubspot_spam_stage: null }, 'new'],
+};
+
+for (const [name, [spam, order, stage]] of Object.entries(spamStages)) {
+  test(`hubspot data: ${name}`, () => {
+    assert.equal(hubspotData({ payload: form, ...order }, {}, spam).deal.dealstage, stage);
+  });
+}
+
+test('hubspot data: a spam verdict wins over the duplicate stage and is noted on the deal', () => {
+  const { deal } = hubspotData({ payload: form }, { is_good_duplicate: true, last_deal_id: '77' }, { verdict: 'spam', confidence: 0.97 });
+  assert.equal(deal.dealstage, 'review');
+  assert.equal(deal.description, 'Previous deal: 77\nSpam check: spam (confidence 0.97)');
 });

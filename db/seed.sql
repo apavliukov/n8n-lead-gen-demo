@@ -1,4 +1,4 @@
--- Demo data: one site, two products, three providers. Idempotent.
+-- Demo data: one site, two products, four providers. Idempotent.
 -- In production these tables are maintained by the back-office app; n8n only reads them.
 SET search_path TO leadgen;
 
@@ -8,25 +8,27 @@ ON CONFLICT (id) DO NOTHING;
 
 -- 'default' and 'appointmentscheduled' are the ids of HubSpot's built-in sales pipeline and its first stage.
 -- Stage ids are fixed at creation and survive renames, so they do not match the stage names.
--- hubspot_duplicate_stage is account-specific: create a "Duplicate" stage and replace the id below with yours.
-INSERT INTO products (id, site_id, external_id, name, price, required_fields, hubspot_pipeline, hubspot_stage, hubspot_duplicate_stage)
+-- hubspot_duplicate_stage and hubspot_spam_stage are account-specific: create the two stages and replace the ids below with yours.
+INSERT INTO products (id, site_id, external_id, name, price, required_fields, hubspot_pipeline, hubspot_stage, hubspot_duplicate_stage, hubspot_spam_stage)
 VALUES
-    (1, 1, 'mobile-10gb', 'Mobile 10 GB', 9.99, '["birth_place", "id_number", "id_valid_until"]', 'default', 'appointmentscheduled', '6503850198'),
-    (2, 1, 'dsl-100', 'DSL 100', 29.99, '[]', 'default', 'appointmentscheduled', '6503850198')
+    (1, 1, 'mobile-10gb', 'Mobile 10 GB', 9.99, '["birth_place", "id_number", "id_valid_until"]', 'default', 'appointmentscheduled', '6503850198', '6530088124'),
+    (2, 1, 'dsl-100', 'DSL 100', 29.99, '[]', 'default', 'appointmentscheduled', '6503850198', '6530088124')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO providers (id, type, name)
 VALUES
     (1, 'hubspot', 'HubSpot'),
     (2, 'meta', 'Meta Conversions API'),
-    (3, 'email', 'Transactional email')
+    (3, 'email', 'Transactional email'),
+    (4, 'typesafe', 'TypeSafe Jev')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO site_providers (site_id, provider_id, settings)
 VALUES
     (1, 1, '{}'),
     (1, 2, '{"pixel_id": "REPLACE_ME"}'),
-    (1, 3, '{}')
+    (1, 3, '{}'),
+    (1, 4, '{}')
 ON CONFLICT (site_id, provider_id) DO NOTHING;
 
 -- Explicit ids above do not advance the sequences.

@@ -38,6 +38,7 @@ flowchart TD
 | Step: HubSpot | called by processing | Create the contact and the deal; mandatory, a failure stops the run |
 | Step: Order email, Step: Meta event | called by processing | One provider action each: decide whether it applies, perform it, record it |
 | Duplicate check | called by intake and processing | Find the customer in HubSpot by email or phone and classify the latest deal |
+| Spam check | called by processing | Ask a classification model whether the form looks like a real order |
 | Scheduler | every 5 minutes, or `POST /webhook/scheduler/run` with a key | Process due orders in batches, alert about orders that ran out of attempts |
 | Error alert | failed execution of any workflow above | Report the workflow, node, error and execution link to Telegram |
 | HubSpot setup | manual, once per account | Create the custom deal and contact properties |
@@ -78,6 +79,15 @@ failed, otherwise the run ends with an error that names the failed steps, and th
 repeats only those. Adding a provider means one new workflow and one node in the chain.
 
 ![Step: Meta event workflow](assets/step-meta-event.png)
+
+**A classifier flags junk orders, a person decides.** Before the deal is created, a
+classification model (TypeSafe Jev) rates the form as `ok`, `suspicious` or `spam`. Jev
+picks one of the options it was given and returns calibrated probabilities; it cannot
+produce text, so there is nothing to parse and no room for a made-up answer. A `spam`
+verdict only moves the deal to a separate review stage; the verdict and its confidence are
+noted on every deal and stored. The check runs after the landing page has been answered,
+sends only the name, address and email, and never blocks an order: if the model is
+unavailable, processing goes on without a verdict.
 
 **HubSpot is the only source of truth for duplicates.** A previous deal younger than the
 site's threshold (30 days) makes a bad duplicate that is never processed; an older one makes
@@ -143,7 +153,7 @@ front of port 5678, and locally `jq`, `curl` and Node 24.
    the editor; imported workflows arrive unpublished. Publish `Duplicate check` first, then
    `Order processing`, then the rest: n8n refuses to publish a workflow before the
    sub-workflows it calls.
-5. **HubSpot.** Run the `HubSpot setup` workflow once, create a "Duplicate" deal stage and
+5. **HubSpot.** Run the `HubSpot setup` workflow once, create a "Duplicate" and a "Spam" deal stage and
    put the pipeline and stage ids into `leadgen.products`.
 6. **Meta.** Put the pixel id (and, for testing, a `test_event_code`) into
    `leadgen.site_providers.settings` of the Meta provider.
@@ -182,7 +192,7 @@ and replace the neighbouring nodes with canned outputs, such as a HubSpot search
 They cover validation, duplicate classification and the HubSpot mapping.
 
 The test stand (`compose.test.yaml`) is a fresh n8n with its own Postgres, Mailpit and a
-small stub server that plays HubSpot, Meta and Telegram. `scripts/stand.sh up` applies the
+small stub server that plays HubSpot, Meta, TypeSafe and Telegram. `scripts/stand.sh up` applies the
 schema and the seed, imports the exports with the provider hosts pointed at the stub and
 publishes them, so every run also proves that the repository installs from scratch. The e2e
 tests post orders and then check the database, the mailbox and the requests the stub
@@ -200,6 +210,12 @@ tests prove that a customer's orders are spaced out, not that one minute is enou
 
 ## Known limitations
 
+- **The spam check sends personal data to a third party.** Name, address and email go to
+  TypeSafe; bank and identity data do not. A production setup needs a data processing
+  agreement, or the provider is switched off per site in `site_providers`.
+- **The spam verdict is the most probable option, without a threshold.** The stored
+  probabilities allow one. Test-looking data is flagged on purpose: "Mustermann" on
+  "Musterstraße" is rated as spam.
 - **The verification link is a GET that changes state.** Mail scanners that open links can
   verify an address on the customer's behalf.
 - **One account per provider type.** A node is bound to one credential, so all sites share

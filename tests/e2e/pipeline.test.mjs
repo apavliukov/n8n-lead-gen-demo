@@ -12,6 +12,7 @@ const { N8N_URL, STUB_URL, MAILPIT_URL } = process.env;
 const skip = STUB_URL ? false : 'needs the test stand: scripts/stand.sh test';
 const base = JSON.parse(readFileSync(new URL('../../test-payloads/valid-new.json', import.meta.url)));
 const DUPLICATE_STAGE = '6503850198'; // products.hubspot_duplicate_stage in db/seed.sql
+const SPAM_STAGE = '6530088124'; // products.hubspot_spam_stage in db/seed.sql
 
 const customer = (overrides = {}) => ({
   ...base,
@@ -80,7 +81,7 @@ test('processes an order from a verified address through every step', { skip }, 
   const row = await completed(id);
   assert.equal(row.duplicate, 0);
   assert.equal(row.next_attempt_at, null);
-  assert.deepEqual(steps(id), ['email_order_received', 'hubspot_contact', 'hubspot_deal', 'meta_purchase']);
+  assert.deepEqual(steps(id), ['email_order_received', 'hubspot_contact', 'hubspot_deal', 'meta_purchase', 'spam_check']);
 
   const deal = await dealOf(id);
   assert.equal(deal.properties.order_email, payload.email);
@@ -153,7 +154,7 @@ test('schedules a retry and alerts when a provider rejects the order', { skip },
   assert.equal(row.completed_at, null);
   assert.equal(row.attempts, 1);
   assert.ok(new Date(row.next_attempt_at) > new Date(Date.now() + 10 * 60000), 'next attempt is about 15 minutes away');
-  assert.deepEqual(steps(id), []);
+  assert.deepEqual(steps(id), ['spam_check'], 'nothing after the failed HubSpot step');
 });
 
 test('refuses a scheduler pass without the key', { skip }, async () => {
@@ -236,7 +237,7 @@ test('keeps the other steps going when one provider fails and retries only the f
     'the error alert',
   );
   assert.match(alert.body.text, /Order processing/);
-  assert.deepEqual(steps(id), ['email_order_received', 'hubspot_contact', 'hubspot_deal']);
+  assert.deepEqual(steps(id), ['email_order_received', 'hubspot_contact', 'hubspot_deal', 'spam_check']);
   assert.equal(order(id).completed_at, null);
 
   await post(`${STUB_URL}/__heal`, { event_id: String(id) });
@@ -247,4 +248,46 @@ test('keeps the other steps going when one provider fails and retries only the f
   const { messages } = await json(`${MAILPIT_URL}/api/v1/search?query=${encodeURIComponent(`to:${payload.email}`)}`);
   assert.equal(messages.length, 1, 'the email is not sent again');
   assert.equal((await stubRequests(/\/objects\/deals$/)).filter((r) => r.body.properties.order_number === String(id)).length, 1);
+});
+
+test('puts the deal of an order flagged as spam into the review stage', { skip }, async () => {
+  const payload = customer({ first_name: 'spam' }); // the stub answers with the first name as the verdict
+  verify(payload.email);
+  const { order_id: id, is_duplicate } = await submit(payload);
+  assert.equal(is_duplicate, false, 'the landing page is not told about the verdict');
+
+  await completed(id);
+  const deal = await dealOf(id);
+  assert.equal(deal.properties.dealstage, SPAM_STAGE);
+  assert.match(deal.properties.description, /Spam check: spam \(confidence 0\.97\)/);
+  const [record] = sql(`SELECT response FROM leadgen.provider_records WHERE order_id = ${id} AND type = 'spam_check'`);
+  assert.equal(record.response.choice, 'spam');
+
+  const sent = (await stubRequests(/systemone$/)).find((r) => r.body.state.email === payload.email);
+  assert.deepEqual(
+    Object.keys(sent.body.state).sort(),
+    ['city', 'email', 'first_name', 'house_number', 'last_name', 'postal_code', 'street'],
+    'only the whitelisted fields leave the system',
+  );
+});
+
+test('keeps a suspicious order in the normal stage with a note', { skip }, async () => {
+  const payload = customer({ first_name: 'suspicious' });
+  verify(payload.email);
+  const { order_id: id } = await submit(payload);
+  await completed(id);
+  const deal = await dealOf(id);
+  assert.equal(deal.properties.dealstage, 'appointmentscheduled');
+  assert.match(deal.properties.description, /Spam check: suspicious/);
+});
+
+test('processes the order normally when the spam check is unavailable', { skip }, async () => {
+  const payload = customer({ first_name: 'jev-down' });
+  verify(payload.email);
+  const { order_id: id } = await submit(payload);
+  await completed(id);
+  const deal = await dealOf(id);
+  assert.equal(deal.properties.dealstage, 'appointmentscheduled');
+  assert.doesNotMatch(deal.properties.description, /Spam check/);
+  assert.ok(!steps(id).includes('spam_check'));
 });

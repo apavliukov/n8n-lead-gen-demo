@@ -1,5 +1,5 @@
 // In-memory stand-in for the external providers of the test stand: HubSpot CRM, the Meta
-// Conversions API and the Telegram Bot API. Implements only the calls the workflows make.
+// Conversions API, TypeSafe Jev and the Telegram Bot API. Implements only the calls the workflows make.
 // Control endpoints: GET /__requests (everything received so far), POST /__reset,
 // POST /__heal {event_id} (stop failing the Meta events of that order).
 import { createServer } from 'node:http';
@@ -72,6 +72,14 @@ const handle = (method, path, body) => {
       return [400, { error: { message: 'Invalid parameter', type: 'OAuthException' } }];
     }
     return [200, { events_received: 1 }];
+  }
+  if (path === '/v1/systemone') {
+    // TypeSafe Jev: the verdict follows the first name, so tests choose it. "jev-down" makes the API fail.
+    const name = body.state.first_name;
+    if (name === 'jev-down') return [529, { detail: 'Overloaded' }];
+    const choice = ['spam', 'suspicious'].includes(name) ? name : 'ok';
+    const probabilities = { ok: 0.01, suspicious: 0.01, spam: 0.01, [choice]: 0.98 };
+    return [200, { model: 'jev-stub', answers: { verdict: { type: 'choice', choice, confidence: 0.97, probabilities } } }];
   }
   if (/^\/bot[^/]+\/sendMessage$/.test(path)) {
     return [200, { ok: true, result: { message_id: nextId++, chat: { id: body.chat_id }, text: body.text } }];
