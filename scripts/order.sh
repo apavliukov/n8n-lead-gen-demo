@@ -1,6 +1,8 @@
 #!/bin/sh
 # Send a test order to the intake webhook. Every call gets a fresh idempotency key,
-# email (autotest-...@example.com) and phone, so nothing has to be edited by hand.
+# email (first.last<digits>@example.com, built from the fixture's name) and phone, so nothing
+# has to be edited by hand. The address looks like a real one on purpose: the spam check
+# flags obviously generated ones.
 # Usage: scripts/order.sh [-t] [-r] [-s] [-v] [-f fixture] [field=value ...]
 #   -t          use the test URL (/webhook-test), while "Listen for test event" is on in the editor
 #   -r          replay the previous request unchanged (same idempotency key)
@@ -32,9 +34,11 @@ if [ -n "$replay" ]; then
     payload=$(cat "$last")
 else
     uuid() { cat /proc/sys/kernel/random/uuid; }
-    payload=$(jq --arg key "$(uuid)" --arg email "autotest-$(uuid)@example.com" \
-        --arg phone "+49151$(od -An -N4 -tu4 /dev/urandom | tr -d ' ' | cut -c1-8)" \
-        '.idempotency_key = $key | .email = $email | .phone = $phone' "test-payloads/$fixture.json")
+    digits() { od -An -N4 -tu4 /dev/urandom | tr -d ' ' | cut -c1-"$1"; }
+    payload=$(jq --arg key "$(uuid)" --arg n "$(digits 6)" --arg phone "+49151$(digits 8)" \
+        '.idempotency_key = $key | .phone = $phone
+         | .email = "\(.first_name).\(.last_name)\($n)@example.com" | .email |= ascii_downcase' \
+        "test-payloads/$fixture.json")
     if [ -n "$same" ]; then
         payload=$(printf '%s' "$payload" | jq --slurpfile last "$last" '.email = $last[0].email | .phone = $last[0].phone')
     fi
