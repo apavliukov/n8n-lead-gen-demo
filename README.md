@@ -237,3 +237,7 @@ tests prove that a customer's orders are spaced out, not that one minute is enou
   message is sent.
 - **Error alerts are not deduplicated.** An outage of a provider produces one message per
   failed execution.
+
+## License
+
+[MIT](LICENSE)
